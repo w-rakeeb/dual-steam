@@ -1,3 +1,3 @@
 Steam glyph source: https://dashboardicons.com/icons/steam
-Original artwork retained as steam.svg / steam.png. Dual Steam 3.0.1 uses the original single Steam mark for its manager. Second Steam restores the dark rounded-square variant. Both fill the same 512 x 512 canvas; ICO sizes: 16, 24, 32, 48, 64, 128, 256.
+Original artwork retained as steam.svg / steam.png. Dual Steam 3.0.2 uses overlapping blue and white Steam glyphs on a dark rounded tile, matching the Dual Discord layout. Second Steam uses the original Steam glyph geometry on a dark circle, with the same 512 x 512 visible bounds and glyph scale as Main Steam. ICO sizes: 16, 24, 32, 48, 64, 128, 256.
 Independent utility, not an official Valve product. Steam trademarks belong to Valve. The MIT license applies to original code, not third-party brand rights.
