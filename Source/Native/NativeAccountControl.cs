@@ -46,6 +46,7 @@ public static class NativeAccountControl {
  static string Image(Process process){IntPtr handle=OpenProcess(0x1000,false,process.Id);try{var path=new StringBuilder(2048);uint size=(uint)path.Capacity;return handle!=IntPtr.Zero&&QueryFullProcessImageName(handle,0,path,ref size)?path.ToString():"";}finally{if(handle!=IntPtr.Zero)CloseHandle(handle);}}
  static bool Own(Process process){IntPtr handle=OpenProcess(0x1000,false,process.Id),token=IntPtr.Zero;try{if(handle==IntPtr.Zero||!OpenProcessToken(handle,8,out token))return false;using(var identity=new WindowsIdentity(token))return identity.User==WindowsIdentity.GetCurrent().User;}finally{if(token!=IntPtr.Zero)CloseHandle(token);if(handle!=IntPtr.Zero)CloseHandle(handle);}}
  static Process[] Clients(){return new[]{"steam","steamwebhelper","gameoverlayui64","steamerrorreporter64"}.SelectMany(name=>Process.GetProcessesByName(name)).Where(p=>{try{return Own(p)&&Image(p).StartsWith(Client,StringComparison.OrdinalIgnoreCase);}catch{return false;}}).ToArray();}
+ static bool ForeignClient(){return Process.GetProcessesByName("steam").Any(p=>Image(p).Equals(Client+"steam.exe",StringComparison.OrdinalIgnoreCase)&&!Own(p));}
  static Process[] Games(int app=0){
   var tracked=new Dictionary<int,Tuple<int,DateTime>>();string log=Client+@"logs\gameprocess_log.txt";
   if(!File.Exists(log))return new Process[0];
@@ -89,6 +90,7 @@ public static class NativeAccountControl {
   if(action=="detach"){Write(new{Success=true});return 0;}
   var clients=Clients();var roots=clients.Where(p=>p.ProcessName.Equals("steam",StringComparison.OrdinalIgnoreCase)).ToArray();
   if(action=="open"){
+   if(ForeignClient())throw new IOException("The second-client folder is being used outside its managed Windows account. Exit that Steam window normally, then use the Second Steam shortcut. No other Steam process was closed.");
    if(roots.Length>1)throw new Exception("Duplicate native clients found; close extras before continuing.");
    Environment.SetEnvironmentVariable("steam_master_ipc_name_override",null);
    if(roots.Length==0){

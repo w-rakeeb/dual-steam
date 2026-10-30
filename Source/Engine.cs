@@ -23,6 +23,8 @@ public static class Engine {
  [DllImport("kernel32")]static extern bool CloseHandle(IntPtr h);
  [DllImport("kernel32",CharSet=CharSet.Unicode)]static extern bool QueryFullProcessImageName(IntPtr h,uint flags,StringBuilder path,ref uint size);
  [DllImport("user32")]static extern bool SetForegroundWindow(IntPtr h);
+ [DllImport("user32")]static extern bool AllowSetForegroundWindow(int pid);
+ public static void AllowForeground(int pid){AllowSetForegroundWindow(pid);}
  [DllImport("user32")]static extern bool ShowWindowAsync(IntPtr h,int mode);
  delegate bool WindowCallback(IntPtr h,IntPtr value);
  [DllImport("user32")]static extern bool EnumWindows(WindowCallback callback,IntPtr value);
@@ -75,7 +77,7 @@ public static class Engine {
   if(MedalCompatibility.HasConflict())throw new Exception("Medal's Steam helpers conflict with this profile. In Settings > Compatibility, enable Medal compatibility to keep its recorder available while disabling those helpers.");
   bool stopped=!Process.GetProcessesByName("steam").Any(p=>String.Equals(Image(p),Current.SecondSteam,StringComparison.OrdinalIgnoreCase));
   if(stopped)LibraryCatalog.Sync(Current);EnsureBroker();if(stopped&&Preferences.Current.AutoArc)try{GamePreferences.Copy();}catch(IOException ex){LastLaunchNotice="Second Steam opened. Automatic preference copy was skipped: "+ex.Message;Log(LastLaunchNotice);}
-  if(stopped&&Preferences.Current.SyncMillennium)try{MillenniumSharing.Import();}catch(IOException ex){LastLaunchNotice="Second Steam opened. Automatic add-on import was skipped: "+ex.Message;Log(LastLaunchNotice);}Control("open");
+  if(stopped&&Preferences.Current.SyncMillennium)try{MillenniumSharing.Import();}catch(IOException ex){LastLaunchNotice="Second Steam opened. Automatic add-on import was skipped: "+ex.Message;Log(LastLaunchNotice);}foreach(var broker in Process.GetProcessesByName("NativeAccountControl"))if(Image(broker).Equals(Helper,StringComparison.OrdinalIgnoreCase))AllowForeground(broker.Id);Control("open");
  }}
  public static void QuitSecond(){lock(Gate){if(!BrokerRunning()&&Status().RootIds.Length>0)EnsureBroker();if(BrokerRunning())Control("stop");}}
  public static Process[] MainSteam(){string path=Current==null?DetectSteam():Current.MainSteam;return Process.GetProcessesByName("steam").Where(p=>{try{return String.Equals(Image(p),path,StringComparison.OrdinalIgnoreCase);}catch{return false;}}).ToArray();}
