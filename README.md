@@ -1,0 +1,90 @@
+# Dual Steam
+
+Two independent Steam logins on one Windows desktop, with separate account data and shared installed game libraries.
+
+**Windows 10 / Windows 11, x64 · .NET Framework 4.8 · Version 3.0.0**
+
+[Download the latest release](https://github.com/w-rakeeb/dual-steam/releases/latest)
+
+## First-time setup
+
+1. Download **Dual-Steam-Windows.zip** and extract the entire ZIP into a writable folder. Keep all of its files together.
+2. Open **Dual Steam.exe**. Choose **Set up** on the second profile.
+3. Confirm the detected main `steam.exe`, or browse to it. Choose a separate, empty local folder for the second client and its Windows profile.
+4. Approve the Windows administrator prompt. Setup creates a uniquely named **standard** local Windows account, not an administrator account. Your existing Steam installation and login remain in place.
+5. Open Second Steam. Steam downloads/updates its clean client, then asks you to sign in to the second Steam account. Enter passwords and Steam Guard codes only inside Steam.
+6. Use **Settings → General → Add / repair desktop shortcuts** if you want a direct Second Steam shortcut.
+
+You stay on your current Windows desktop. No Sandboxie, virtual machine or manual Windows account switching is used. Administrator permission is needed for account/profile setup, not routine Steam launches. Windows retains system account records and a small initial profile backup on its system drive; this is not a guarantee of zero system-drive usage.
+
+## What it does
+
+| Area | Features |
+| --- | --- |
+| Profiles | Open, focus and quit Second Steam; recover hidden Library windows; identify an interface still starting |
+| Performance | Client process count, summed working-set memory, sampled CPU, root PID and uptime; games are separate |
+| Appearance | Dark, Light and System themes; equal-sized Steam artwork; distinct second-client taskbar identity and icon |
+| Background | Close manager to tray; optional second-client tray control; selectable independent or manager-required operation |
+| Libraries | Detect existing libraries on any drive, including the system drive when selected; no copying entire games |
+| Sharing | Selective ARC Raiders preferences and keybindings; detected Millennium runtime/themes/configuration/plugins; optional copy before launch |
+| Maintenance | Repair shortcuts, reset manager preferences, inspect supported settings, save diagnostics and restore previous ARC preferences |
+| Updates | Automatic startup/six-hour checks, manual checking, available-update prompt and SHA-256-verified installation with backups |
+
+The Second Steam shortcut starts/focuses the client with the dashboard hidden. Reopening the manager shortcut restores the same dashboard instead of starting another copy.
+
+## How isolation and storage work
+
+Second Steam runs as the managed standard local account, with its own Windows profile, user registry, Steam configuration, cache and game saves. Separate Steam IPC identifiers prevent normal launch requests from being routed to the other client. A local authenticated named pipe connects the manager to the background controller; account credentials are encrypted for the Windows user who performed setup and are not uploaded anywhere.
+
+| Content | Location |
+| --- | --- |
+| Manager preferences, encrypted setup state and logs | `<app folder>/Data` |
+| Second Steam binaries, config and userdata | `<chosen data folder>/Client` |
+| Second Windows AppData, settings and saves | `<chosen data folder>/Windows Profile` |
+| Supported game-settings backups | `<chosen data folder>/Evidence/Settings Backups` |
+| Add-on and application-update backups | `<app folder>/Backups` |
+| Update downloads | `<app folder>/Updates` |
+
+The existing development installation retains its legacy folder name without relocating its working Windows profile. Fresh installations use the folder chosen in setup. Do not copy a configured installation to another PC: download the clean release and run setup there. Do not share `Data`, Windows profiles, Steam userdata or credentials.
+
+Game libraries are the real shared files. A Steam/game update changes those shared files. Local game preferences, Steam Cloud data and publisher-account preferences are different things and can be stored separately. Sharing a game installation does not automatically share every setting.
+
+## Sharing and add-ons
+
+**ARC Raiders:** graphics/display/language sections in `GameUserSettings.ini`, selected audio/controls/gameplay/crosshair/accessibility values in the known `EmbarkOptionSaveGame.sav` format, and optional custom keybindings. The game must be closed in both clients. Legal/voice consent, onboarding, account caches, progression and shader metadata are excluded. Every operation backs up and verifies its writes; unknown formats are rejected. Steam Cloud or publisher services may restore account-specific values later.
+
+**Millennium:** import options appear only when the main client contains the relevant components. Choose the runtime, themes, appearance configuration/custom CSS, and plugins separately. Proxy credentials, Steam logins and unrelated root DLLs are excluded. Importing add-ons is optional and off by default; plugins/themes can run code in Steam and can affect stability. Quit Second Steam before importing. Main Steam can stay open. Backups are retained.
+
+THE FINALS and Among Us local folders can be detected for inspection, but their binary/account files are not blindly synchronized. Additional games need format-specific adapters.
+
+## Background mode and tray menus
+
+Independent operation is enabled by default. Turn off **Keep Second Steam running after the manager exits** to require the manager. In that mode, an explicit manager exit closes Second Steam; if the manager disappears unexpectedly, the controller closes the second client and its verified tracked games after a short grace period. Save your game before exiting. Main Steam remains independent.
+
+Dual Steam's own tray controls follow its selected theme. Steam's original native tray icon/menu can remain alongside them; Explorer internals are not patched or injected.
+
+## Updates and release safety
+
+Updates come only from this repository's stable GitHub releases. The updater validates the release digest, rejects unexpected/path-traversal/private-data ZIP entries, creates backups and rolls back on failure. Quit Second Steam before installing; Main Steam can remain running. The release never includes configured accounts, logins, game saves, personal settings or Millennium binaries.
+
+If first-time setup is interrupted, its protected journal and encrypted credential are retained so an owned partial setup can resume without replacing another Windows account. A matching account/profile is never silently taken over. Diagnostic files remain local unless you choose to share them.
+
+## Compatibility and validation
+
+This is an independent utility, not an official Valve multi-client feature. Steam updates, third-party overlays, anti-cheat systems and individual games can affect compatibility. Do not assume that every game or simultaneous-game combination works.
+
+The existing PC has run both Steam logins, ARC Raiders, Among Us and Medal clipping in the recorded tests. The current build includes core validation, update rollback/package tests and live lifecycle tests. Windows 10/11 x64 are targeted using .NET Framework 4.8 and supported desktop APIs; Windows 10 and every fresh-PC/game combination have not been independently runtime-tested. Expanded ARC preferences still need the user's next in-game confirmation.
+
+This build is not code-signed. Windows may show its usual downloaded-app or administrator prompts. No passwords or Steam Guard codes should be entered into Dual Steam.
+
+## Build
+
+On Windows x64 with .NET Framework 4.8:
+
+```powershell
+.\Source\Build.ps1
+.\Tests\Run.ps1
+.\Source\Package.ps1
+```
+
+The build produces the manager, updater and native controller. The package script uses an explicit runtime-file allowlist and excludes private data. Source code is MIT licensed. Steam names, logos and other trademarks belong to Valve; the artwork source is documented in `Assets/SOURCE.md`.

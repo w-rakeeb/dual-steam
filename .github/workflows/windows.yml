@@ -1,0 +1,25 @@
+name: Windows build and core checks
+on:
+  push:
+  pull_request:
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build
+        shell: pwsh
+        run: ./Source/Build.ps1
+      - name: Validate preferences, setup paths and updates
+        shell: pwsh
+        run: ./Tests/Run.ps1
+      - name: Build clean release archive
+        shell: pwsh
+        run: ./Source/Package.ps1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Dual-Steam-Windows
+          path: |
+            Release/Dual-Steam-Windows.zip
+            Release/SHA256SUMS.txt
+

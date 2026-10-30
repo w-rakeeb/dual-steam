@@ -1,0 +1,6 @@
+using System.Drawing;using Forms=System.Windows.Forms;
+public sealed class TrayColors:Forms.ProfessionalColorTable {
+ readonly bool light;Color Surface{get{return light?Color.FromArgb(255,255,255):Color.FromArgb(30,32,36);}}Color Hover{get{return light?Color.FromArgb(229,232,238):Color.FromArgb(44,47,53);}}
+ public TrayColors(bool value){light=value;UseSystemColors=false;}
+ public override Color ToolStripDropDownBackground{get{return Surface;}}public override Color ImageMarginGradientBegin{get{return Surface;}}public override Color ImageMarginGradientMiddle{get{return Surface;}}public override Color ImageMarginGradientEnd{get{return Surface;}}public override Color MenuBorder{get{return light?Color.FromArgb(210,212,219):Color.FromArgb(59,61,69);}}public override Color MenuItemBorder{get{return Hover;}}public override Color MenuItemSelected{get{return Hover;}}public override Color MenuItemSelectedGradientBegin{get{return Hover;}}public override Color MenuItemSelectedGradientEnd{get{return Hover;}}public override Color MenuItemPressedGradientBegin{get{return Hover;}}public override Color MenuItemPressedGradientMiddle{get{return Hover;}}public override Color MenuItemPressedGradientEnd{get{return Hover;}}public override Color SeparatorDark{get{return MenuBorder;}}public override Color SeparatorLight{get{return Surface;}}
+}

@@ -1,0 +1,13 @@
+Data/
+Profiles/
+Native Prototype/
+Backups/
+Verification/
+Release/
+Runtime/
+Tools/
+*.exe
+*.exe.config
+*.pdb
+CoreTests-*
+Updates/
