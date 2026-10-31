@@ -1,0 +1,48 @@
+name: Service control
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      state:
+        description: Startup availability
+        type: choice
+        required: true
+        default: keep
+        options: [keep, active, paused, shutdown]
+      announcement:
+        description: Announcement shown at next startup (up to 2000 characters)
+        type: string
+        required: false
+permissions:
+  contents: write
+concurrency:
+  group: signed-service-policy
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || (!github.event.release.prerelease && !github.event.release.draft)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+      - name: Sign startup announcement and required release
+        shell: pwsh
+        env:
+          DUAL_STEAM_POLICY_KEY: ${{ secrets.DUAL_STEAM_POLICY_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          CONTROL_STATE: ${{ inputs.state }}
+          CONTROL_MESSAGE: ${{ inputs.announcement }}
+        run: |
+          $state=if($env:CONTROL_STATE){$env:CONTROL_STATE}else{'keep'}
+          $parameters=@{State=$state}
+          if($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch'){$parameters.Announcement=$env:CONTROL_MESSAGE}
+          ./tools/Publish-ServicePolicy.ps1 @parameters
+          git config user.name 'Dual Steam service control'
+          git config user.email 'actions@users.noreply.github.com'
+          git add service-policy.json
+          git diff --cached --quiet
+          if($LASTEXITCODE -eq 0){exit 0}
+          git commit -m 'Publish signed startup availability and required release'
+          git push origin HEAD:main
