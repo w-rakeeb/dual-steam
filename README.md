@@ -2,7 +2,7 @@
 
 Two independent Steam logins on one Windows desktop, with separate account data and shared installed game libraries.
 
-**Windows 10 / Windows 11, x64 · .NET Framework 4.8 · Version 3.3.1**
+**Windows 10 / Windows 11, x64 · .NET Framework 4.8 · Version 3.3.2**
 
 [Download the latest release](https://github.com/w-rakeeb/dual-steam/releases/latest)
 
@@ -91,7 +91,7 @@ The build produces the manager, updater and native controller. The package scrip
 
 Medal integration is left unchanged during launch. The optional compatibility control is troubleshooting only, not a requirement or a confirmed diagnosis. Main Steam, Second Steam and the manager have distinct taskbar identities; desktop and recognized pinned shortcuts are repaired by Add / repair desktop shortcuts.
 
-## Version 3.3.1 recovery fixes
+## Version 3.3.2 recovery fixes
 
 - Hidden, sign-in and update windows are detected and restored without starting a duplicate client. A first download remains a starting state; an exited client reports a launch failure.
 - The controller creates its Evidence directory before writing startup records. An unfinished removal blocks launches and offers **Settings → General → Finish removing setup** instead of recreating a broken client folder.

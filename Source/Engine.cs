@@ -61,6 +61,17 @@ public static class Engine {
  }}
  static bool BrokerRunning(){return Process.GetProcessesByName("NativeAccountControl").Any(p=>{try{return String.Equals(Image(p),Helper,StringComparison.OrdinalIgnoreCase);}catch{return false;}});}
  public static void Log(string text){try{string folder=Path.Combine(Home,@"Data\Logs");Directory.CreateDirectory(folder);File.AppendAllText(Path.Combine(folder,"manager.log"),DateTime.Now.ToString("s")+" "+text+Environment.NewLine);}catch{}}
+ public static void PrepareUpdate(){
+  if(Current==null)return;
+  string client=Path.Combine(NativeRoot,"Client")+"\\";
+  if(Process.GetProcesses().Any(p=>{try{return !p.ProcessName.Equals("NativeAccountControl",StringComparison.OrdinalIgnoreCase)&&Image(p).StartsWith(client,StringComparison.OrdinalIgnoreCase);}catch{return false;}}))throw new IOException("Quit Second Steam and its games before maintenance. Main Steam can stay open.");
+  // An interrupted removal can leave a controller whose profile no longer exists.
+  // Its RPC must not prevent installing the repair; elevated removal checks all owned processes.
+  if(RemovalService.Pending){Log("Maintenance: preserving incomplete-removal records; skipped legacy controller RPC.");return;}
+  if(BrokerRunning()){string evidence=Path.Combine(NativeRoot,"Evidence");SettingsTransfer.NoLinks(evidence);Directory.CreateDirectory(evidence);}
+  var status=Status();if((status.RootIds??new int[0]).Length>0||(status.GameIds??new int[0]).Length>0)throw new IOException("Quit Second Steam and its games before maintenance. Main Steam can stay open.");
+  if(BrokerRunning())Control("detach");
+ }
  public static NativeStatus Status(){if(BrokerRunning())return Control("status");var roots=Current==null?new Process[0]:Process.GetProcessesByName("steam").Where(p=>Image(p).Equals(Current.SecondSteam,StringComparison.OrdinalIgnoreCase)).ToArray();var result=new NativeStatus{Success=true,RootIds=roots.Select(p=>p.Id).ToArray(),ClientIds=roots.Select(p=>p.Id).ToArray(),GameIds=new int[0],Count=roots.Length,Error=roots.Length>0?"Controller disconnected. Use Focus to reconnect.":null};if(roots.Length>0)try{result.Started=roots[0].StartTime.ToUniversalTime().Ticks;result.Memory=roots.Sum(p=>p.WorkingSet64);}catch{}return result;}
  public static void EnsureBroker(){lock(Gate){RemovalService.RequireComplete();Account();if(BrokerRunning())return;string shipped=Path.Combine(Home,@"Tools\NativeAccountControl.exe");if(!File.Exists(shipped))throw new IOException("The complete app folder is required. Extract the full release ZIP.");if(Current==null||!File.Exists(Current.SecondSteam))throw new IOException("The Second Steam client is missing. Finish removal in Settings, then set it up again.");Directory.CreateDirectory(Path.Combine(NativeRoot,"Evidence"));Directory.CreateDirectory(Path.GetDirectoryName(Helper));File.Copy(shipped,Helper,true);Run(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),@"WindowsPowerShell\v1.0\powershell.exe"),"-NoProfile -ExecutionPolicy Bypass -File "+Quote(Path.Combine(Home,@"Source\StartNative.ps1")));Exception last=null;for(int i=0;i<12;i++){try{Control("status");return;}catch(Exception ex){last=ex;System.Threading.Thread.Sleep(250);}}throw new IOException("The background controller did not become ready. Reopen Dual Steam and try again.",last);}}
  public static NativeStatus Control(string command){lock(Gate){
