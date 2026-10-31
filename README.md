@@ -2,7 +2,7 @@
 
 Two independent Steam logins on one Windows desktop, with separate account data and shared installed game libraries.
 
-**Windows 10 / Windows 11, x64 · .NET Framework 4.8 · Version 3.1.0**
+**Windows 10 / Windows 11, x64 · .NET Framework 4.8 · Version 3.1.1**
 
 [Download the latest release](https://github.com/w-rakeeb/dual-steam/releases/latest)
 
