@@ -13,7 +13,7 @@ try{
  [SettingsTransfer]::NoLinks($Request)
  $r=Get-Content -LiteralPath $Request -Raw -Encoding UTF8 | ConvertFrom-Json
  $p=New-Object RemovalPlan
- foreach($name in 'Home','Root','Profile','MainSteam','User','SID','IssuerSID','OriginalProfileBackup','Libraries'){$p.$name=$r.$name}
+ foreach($name in 'Home','Root','Profile','RegisteredProfile','MainSteam','User','SID','IssuerSID','OriginalProfileBackup','Libraries'){$p.$name=$r.$name}
  $index=Join-Path (Split-Path $r.MainSteam -Parent) 'steamapps\libraryfolders.vdf'
  if(Test-Path -LiteralPath $index){if((Get-Item -LiteralPath $index).Length -gt 1048576){throw 'Main Steam library index is too large'};$p.Libraries=@($p.Libraries)+@([LibraryCatalog]::ReadPaths([IO.File]::ReadAllText($index)))}
  [RemovalCore]::Validate($p,$r.IssuerSID)
@@ -37,13 +37,31 @@ try{
  $processes=Get-CimInstance Win32_Process
  foreach($process in $processes){if($process.ExecutablePath -eq (Join-Path $r.Root 'Client\NativeAccountControl.exe') -and [RemovalCore]::ProcessUsesAccount([int]$process.ProcessId,$r.SID)){$controller=Get-Process -Id $process.ProcessId -ErrorAction SilentlyContinue;if($controller -and [Engine]::Image($controller) -eq (Join-Path $r.Root 'Client\NativeAccountControl.exe')){$controller.Kill();if(!$controller.WaitForExit(10000)){throw 'The leftover managed controller could not stop'}};continue};if($process.ExecutablePath -and $process.ExecutablePath.StartsWith($r.Root+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'A program still uses the second-client folder. Close it before removal'};if([RemovalCore]::ProcessUsesAccount([int]$process.ProcessId,$r.SID)){$limit=(Get-Date).AddSeconds(10);while([RemovalCore]::ProcessUsesAccount([int]$process.ProcessId,$r.SID) -and (Get-Date) -lt $limit){Start-Sleep -Milliseconds 250};if([RemovalCore]::ProcessUsesAccount([int]$process.ProcessId,$r.SID)){throw ('A process still uses the second Windows account: '+$process.Name+' (PID '+$process.ProcessId+'). Close it, or restart Windows, before removal.')}}}
  'Releasing the second Windows profile…' | Set-Content -LiteralPath (Join-Path $state 'progress.txt') -Encoding UTF8
- $profile=Get-CimInstance Win32_UserProfile | Where-Object {$_.SID -eq $r.SID}
+ $profiles=@(Get-CimInstance Win32_UserProfile | Where-Object {$_.SID -eq $r.SID})
+ if($profiles.Count -gt 1){throw 'Windows returned multiple profiles for the managed SID'}
+ $profile=$profiles | Select-Object -First 1
+ $registeredPath=$null
  if(!$profile -and !$trusted){throw 'Windows could not verify the managed profile location. No folder was removed.'}
- if($profile){if($profile.Special -or [IO.Path]::GetFullPath($profile.LocalPath).TrimEnd('\') -ne $r.Profile){throw 'The managed Windows profile has an unexpected location'};$limit=(Get-Date).AddSeconds(20);while($profile.Loaded -and (Get-Date) -lt $limit){Start-Sleep -Milliseconds 500;$profile=Get-CimInstance Win32_UserProfile | Where-Object {$_.SID -eq $r.SID}};if($profile.Loaded){throw 'Windows is still using the second profile. Restart Windows and retry removal.'}}
+ if($profile){
+  if($profile.Special){throw 'A special Windows profile cannot be removed'}
+  $registeredPath=[IO.Path]::GetFullPath($profile.LocalPath).TrimEnd('\')
+  if($r.RegisteredProfile -and $registeredPath -ne $r.RegisteredProfile){throw 'The registered profile changed after preview. Review removal again.'}
+  if($registeredPath -ne $r.Profile -and !$trusted){throw 'The profile moved without a protected removal record. No unverified profile was removed.'}
+  [RemovalCore]::ValidateRegisteredProfile($p,$registeredPath,[RemovalCore]::ProfilesDirectory(),$issuerProfile)
+  $limit=(Get-Date).AddSeconds(20)
+  while($profile.Loaded -and (Get-Date) -lt $limit){Start-Sleep -Milliseconds 500;$profile=Get-CimInstance Win32_UserProfile | Where-Object {$_.SID -eq $r.SID}}
+  if($profile.Loaded){throw 'Windows is still using the second profile. Restart Windows and retry removal.'}
+  if($profile -and ([IO.Path]::GetFullPath($profile.LocalPath).TrimEnd('\') -ne $registeredPath -or $profile.Special)){throw 'The registered profile changed while Windows was releasing it'}
+ }elseif($trusted.RegisteredProfile){
+  $registeredPath=[string]$trusted.RegisteredProfile
+  [RemovalCore]::ValidateRegisteredProfile($p,$registeredPath,[RemovalCore]::ProfilesDirectory(),$issuerProfile)
+ }
  if(!$trusted){New-Item -Path $marker -Force|Out-Null;$acl=New-Object Security.AccessControl.RegistrySecurity;$acl.SetAccessRuleProtection($true,$false);foreach($sid in 'S-1-5-18','S-1-5-32-544'){$identity=New-Object Security.Principal.SecurityIdentifier($sid);$rule=New-Object Security.AccessControl.RegistryAccessRule($identity,'FullControl','ContainerInherit','None','Allow');$acl.AddAccessRule($rule)};Set-Acl -LiteralPath $marker -AclObject $acl;foreach($name in 'Root','Profile','User','IssuerSID'){New-ItemProperty -LiteralPath $marker -Name $name -Value $r.$name -PropertyType String -Force|Out-Null}}
- if($profile){[RemovalCore]::UnlinkProfileLinks($r.Profile);Remove-CimInstance -InputObject $profile}
+ if($registeredPath){New-ItemProperty -LiteralPath $marker -Name RegisteredProfile -Value $registeredPath -PropertyType String -Force | Out-Null}
+ if($profile){[RemovalCore]::UnlinkProfileLinks($registeredPath);Remove-CimInstance -InputObject $profile}
  if(Test-Path -LiteralPath ('Registry::HKEY_USERS\'+$r.SID)){throw 'Windows still has the second profile registry loaded. Restart Windows and retry.'}
  'Removing the second Steam client and profile…' | Set-Content -LiteralPath (Join-Path $state 'progress.txt') -Encoding UTF8
+ if($registeredPath){[RemovalCore]::DeleteTree($registeredPath)}
  [RemovalCore]::DeleteTree($r.Root)
  'Removing the initial Windows profile backup…' | Set-Content -LiteralPath (Join-Path $state 'progress.txt') -Encoding UTF8
  if($r.OriginalProfileBackup){[RemovalCore]::DeleteTree($r.OriginalProfileBackup)}

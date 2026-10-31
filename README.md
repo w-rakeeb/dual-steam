@@ -2,7 +2,7 @@
 
 Two independent Steam logins on one Windows desktop, with separate account data and shared installed game libraries.
 
-**Windows 10 / Windows 11, x64 · .NET Framework 4.8 · Version 3.3.2**
+**Windows 10 / Windows 11, x64 · .NET Framework 4.8 · Version 3.3.3**
 
 [Download the latest release](https://github.com/w-rakeeb/dual-steam/releases/latest)
 
@@ -91,16 +91,15 @@ The build produces the manager, updater and native controller. The package scrip
 
 Medal integration is left unchanged during launch. The optional compatibility control is troubleshooting only, not a requirement or a confirmed diagnosis. Main Steam, Second Steam and the manager have distinct taskbar identities; desktop and recognized pinned shortcuts are repaired by Add / repair desktop shortcuts.
 
-## Version 3.3.2 recovery fixes
+## Version 3.3.3 complete reset recovery
 
-- Hidden, sign-in and update windows are detected and restored without starting a duplicate client. A first download remains a starting state; an exited client reports a launch failure.
-- The controller creates its Evidence directory before writing startup records. An unfinished removal blocks launches and offers **Settings → General → Finish removing setup** instead of recreating a broken client folder.
-- Removal clears read-only Windows directories (including WinX/Group1), waits for the controller to exit, checks process ownership directly, and allows briefly exiting processes to finish before reporting a named blocker. Shared libraries and Main Steam remain protected.
-- In-app dialogs follow Dark/Light themes, support copying error details, and default confirmation keyboard actions to No. Tray controls use matching colors, spacing, icons and separators.
+An interrupted legacy removal can delete the selected profile but leave its Windows account. A later launch makes Windows recreate that same SID's profile under its default Users directory, sometimes with a computer-name suffix. Previous versions incorrectly rejected that registered path as an unexpected location.
 
-If a 3.3.0 removal failed, update first. Back up any remaining second-profile saves, finish removal, then create a fresh setup. This cannot restore data already deleted by the earlier removal. Do not delete recovery records manually.
+Removal now previews the Windows-registered path, validates its managed account name/SID, owner, protected recovery record, default profile directory, and exclusions, then removes the registered profile and original selected folder. The verified path stays in the protected recovery marker if cleanup is interrupted again. Main Steam, owner/system profiles, shared libraries, junction targets and other accounts remain protected. Remove is also available when account metadata survives but settings.json is missing.
 
-Validation: 78 automated checks, clean extracted-folder setup, hidden sign-in restoration, repeat setup/removal, pending-removal launch blocking, live removal UI, and dark/light dialog and tray renders on the development Windows 11 PC. Windows 10 and the recipient's PC still require their own runtime confirmation.
+Install into the existing app folder without deleting Data or Profiles. Quit Second Steam and games. In Settings → General, choose Finish removing setup (or Remove Dual Steam setup), review paths, back up remaining saves, and approve removal. After success, create Second Steam again. In-app updates have a direct ZIP download fallback; older broken updater builds may need one manual replacement.
+
+Validation: 92 automated checks. A disposable account reproduced the exact older-version unexpected-location error after Windows recreated its profile in Users. Patched removal succeeded, a new setup succeeded in the same folder, and removal succeeded with missing preferences and a live managed controller. Main Steam's original process was unchanged. The recipient PC still needs confirmation.
 
 ## Remove a configured setup
 
