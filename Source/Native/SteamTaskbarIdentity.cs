@@ -3,6 +3,10 @@ namespace DualSteamNative {
  public sealed class SteamTaskbarIdentity:IDisposable {
   sealed class Proc {public int Id;public long StartedUtcTicks;}
   public const string SecondSteamId="Wrakeeb.SecondSteam";
+  public const string ManagerId="Wrakeeb.DualSteam.Manager";
+  [DllImport("shell32.dll",CharSet=CharSet.Unicode)]static extern int SetCurrentProcessExplicitAppUserModelID(string id);
+  public static void SetManagerIdentity(){Marshal.ThrowExceptionForHR(SetCurrentProcessExplicitAppUserModelID(ManagerId));}
+  public static void SetManagerWindow(IntPtr window,string home){var store=WindowStore(window);try{Write(store,2,"\""+Path.Combine(home,"Dual Steam.exe")+"\"");Write(store,3,Path.Combine(home,@"Assets\dual-steam.ico")+",0");Write(store,4,"Dual Steam");Write(store,5,ManagerId);Marshal.ThrowExceptionForHR(store.Commit());}finally{Marshal.FinalReleaseComObject(store);}}
   [StructLayout(LayoutKind.Sequential)]struct Key {public Guid Format;public uint Id;public Key(uint id){Format=new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3");Id=id;}}
   [StructLayout(LayoutKind.Sequential)]struct Value {public ushort Type,R1,R2,R3;public IntPtr Text,Extra;}
   [ComImport,Guid("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]interface Store {
@@ -28,7 +32,8 @@ namespace DualSteamNative {
   static string Read(Store store,uint id){var key=new Key(id);Value value;Marshal.ThrowExceptionForHR(store.GetValue(ref key,out value));try{return value.Type==31?Marshal.PtrToStringUni(value.Text):null;}finally{PropVariantClear(ref value);}}
   static void Write(Store store,uint id,string text){var key=new Key(id);var value=new Value();if(text!=null){value.Type=31;value.Text=Marshal.StringToCoTaskMemUni(text);}try{Marshal.ThrowExceptionForHR(store.SetValue(ref key,ref value));}finally{PropVariantClear(ref value);}}
   public static string ReadId(IntPtr window){var store=WindowStore(window);try{return Read(store,5);}finally{Marshal.FinalReleaseComObject(store);}}
-  public static void SetShortcut(string path){Guid iid=typeof(Store).GUID;Store store;Marshal.ThrowExceptionForHR(SHGetPropertyStoreFromParsingName(path,IntPtr.Zero,2,ref iid,out store));try{Write(store,5,SecondSteamId);Marshal.ThrowExceptionForHR(store.Commit());}finally{Marshal.FinalReleaseComObject(store);}}
+  public static void SetShortcut(string path){SetShortcut(path,SecondSteamId);}
+  public static void SetShortcut(string path,string identity){if(identity!=SecondSteamId&&identity!=ManagerId)throw new ArgumentException("Unknown shortcut identity");Guid iid=typeof(Store).GUID;Store store;Marshal.ThrowExceptionForHR(SHGetPropertyStoreFromParsingName(path,IntPtr.Zero,2,ref iid,out store));try{Write(store,5,identity);Marshal.ThrowExceptionForHR(store.Commit());}finally{Marshal.FinalReleaseComObject(store);}}
   static IntPtr IconMessage(IntPtr window,int size,IntPtr icon){UIntPtr result;SendMessageTimeout(window,0x80,new IntPtr(size),icon,2,100,out result);return new IntPtr(unchecked((long)result.ToUInt64()));}
   public void Update(Process[] processes,bool enabled){
    if(!enabled){Restore();return;}foreach(var stale in windows.Keys.Where(k=>!IsWindow(k)).ToArray())windows.Remove(stale);var ids=processes.ToDictionary(p=>p.Id,p=>new Proc{Id=p.Id,StartedUtcTicks=p.StartTime.ToUniversalTime().Ticks});

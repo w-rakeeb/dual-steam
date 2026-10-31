@@ -2,7 +2,7 @@
 
 Two independent Steam logins on one Windows desktop, with separate account data and shared installed game libraries.
 
-**Windows 10 / Windows 11, x64 · .NET Framework 4.8 · Version 3.0.0**
+**Windows 10 / Windows 11, x64 · .NET Framework 4.8 · Version 3.1.0**
 
 [Download the latest release](https://github.com/w-rakeeb/dual-steam/releases/latest)
 
@@ -26,8 +26,8 @@ You stay on your current Windows desktop. No Sandboxie, virtual machine or manua
 | Appearance | Dark, Light and System themes; equal-sized Steam artwork; distinct second-client taskbar identity and icon |
 | Background | Close manager to tray; optional second-client tray control; selectable independent or manager-required operation |
 | Libraries | Detect existing libraries on any drive, including the system drive when selected; no copying entire games |
-| Sharing | Selective ARC Raiders preferences and keybindings; detected Millennium runtime/themes/configuration/plugins; optional copy before launch |
-| Maintenance | Repair shortcuts, reset manager preferences, inspect supported settings, save diagnostics and restore previous ARC preferences |
+| Sharing | Dynamic game-folder discovery, manual settings-folder selection, per-file review/copy/restore; detected Millennium imports |
+| Maintenance | Repair shortcuts, reset manager preferences, scan text settings, save diagnostics and restore the last settings import |
 | Updates | Automatic startup/six-hour checks, manual checking, available-update prompt and SHA-256-verified installation with backups |
 
 The Second Steam shortcut starts/focuses the client with the dashboard hidden. Reopening the manager shortcut restores the same dashboard instead of starting another copy.
@@ -41,7 +41,7 @@ Second Steam runs as the managed standard local account, with its own Windows pr
 | Manager preferences, encrypted setup state and logs | `<app folder>/Data` |
 | Second Steam binaries, config and userdata | `<chosen data folder>/Client` |
 | Second Windows AppData, settings and saves | `<chosen data folder>/Windows Profile` |
-| Supported game-settings backups | `<chosen data folder>/Evidence/Settings Backups` |
+| Supported game-settings backups | `<chosen data folder>/Evidence/Settings Imports` |
 | Add-on and application-update backups | `<app folder>/Backups` |
 | Update downloads | `<app folder>/Updates` |
 
@@ -51,7 +51,7 @@ Game libraries are the real shared files. A Steam/game update changes those shar
 
 ## Sharing and add-ons
 
-**ARC Raiders:** graphics/display/language sections in `GameUserSettings.ini`, selected audio/controls/gameplay/crosshair/accessibility values in the known `EmbarkOptionSaveGame.sav` format, and optional custom keybindings. The game must be closed in both clients. Legal/voice consent, onboarding, account caches, progression and shader metadata are excluded. Every operation backs up and verifies its writes; unknown formats are rejected. Steam Cloud or publisher services may restore account-specific values later.
+**Game settings:** choose an installed game folder. The scanner reads its Steam manifest and project-folder names, then looks for matching folders in Main Windows AppData, Documents and Saved Games. You can select a settings folder manually when names differ. Review candidate files, select individual files, and copy them into corresponding locations in the second Windows profile. A custom relative destination is available for manual folders. Nothing is selected or copied automatically. Text INI/CFG/JSON/XML/YAML/TOML/properties/TXT/VDF settings are supported; binary saves, account/progress data, system/launcher destinations, linked paths and secret-bearing files are excluded. This is a heuristic, not a universal settings converter: files may contain account-specific paths or options, and Steam userdata/cloud/registry/binary settings are not automatically imported. Existing targets are backed up; restore refuses files changed since import. Close the selected game in both clients first. Scans and copies are bounded; source changes invalidate the scan.
 
 **Millennium:** import options appear only when the main client contains the relevant components. Choose the runtime, themes, appearance configuration/custom CSS, and plugins separately. Proxy credentials, Steam logins and unrelated root DLLs are excluded. Importing add-ons is optional and off by default; plugins/themes can run code in Steam and can affect stability. Quit Second Steam before importing. Main Steam can stay open. Backups are retained.
 
@@ -73,7 +73,7 @@ If first-time setup is interrupted, its protected journal and encrypted credenti
 
 This is an independent utility, not an official Valve multi-client feature. Steam updates, third-party overlays, anti-cheat systems and individual games can affect compatibility. Do not assume that every game or simultaneous-game combination works.
 
-The existing PC has run both Steam logins, ARC Raiders, Among Us and Medal clipping in the recorded tests. The current build includes core validation, update rollback/package tests and live lifecycle tests. Windows 10/11 x64 are targeted using .NET Framework 4.8 and supported desktop APIs; Windows 10 and every fresh-PC/game combination have not been independently runtime-tested. Expanded ARC preferences still need the user's next in-game confirmation.
+The existing PC has run both Steam logins, ARC Raiders, Among Us and Medal clipping in the recorded tests. The current build includes core validation, update rollback/package tests and live lifecycle tests. Windows 10/11 x64 are targeted using .NET Framework 4.8 and supported desktop APIs; Windows 10 and every fresh-PC/game combination have not been independently runtime-tested. Generic settings portability still needs per-game confirmation; cloud or publisher settings can override local files.
 
 This build is not code-signed. Windows may show its usual downloaded-app or administrator prompts. No passwords or Steam Guard codes should be entered into Dual Steam.
 
@@ -88,3 +88,5 @@ On Windows x64 with .NET Framework 4.8:
 ```
 
 The build produces the manager, updater and native controller. The package script uses an explicit runtime-file allowlist and excludes private data. Source code is MIT licensed. Steam names, logos and other trademarks belong to Valve; the artwork source is documented in `Assets/SOURCE.md`.
+
+Medal integration is left unchanged during launch. The optional compatibility control is troubleshooting only, not a requirement or a confirmed diagnosis. Main Steam, Second Steam and the manager have distinct taskbar identities; desktop and recognized pinned shortcuts are repaired by Add / repair desktop shortcuts.

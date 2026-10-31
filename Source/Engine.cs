@@ -73,10 +73,8 @@ public static class Engine {
  public static Process[] SecondSteam(){return (Status().RootIds??new int[0]).Select(id=>{try{return Process.GetProcessById((int)id);}catch{return null;}}).Where(p=>p!=null&&p.ProcessName=="steam").ToArray();}
  public static void OpenSecond(){lock(Gate){LastLaunchNotice="";
   if(Current==null)throw new Exception("Set up Second Steam first.");Account();
-  MedalCompatibility.Ensure();
-  if(MedalCompatibility.HasConflict())throw new Exception("Medal's Steam helpers conflict with this profile. In Settings > Compatibility, enable Medal compatibility to keep its recorder available while disabling those helpers.");
   bool stopped=!Process.GetProcessesByName("steam").Any(p=>String.Equals(Image(p),Current.SecondSteam,StringComparison.OrdinalIgnoreCase));
-  if(stopped)LibraryCatalog.Sync(Current);EnsureBroker();if(stopped&&Preferences.Current.AutoArc)try{GamePreferences.Copy();}catch(IOException ex){LastLaunchNotice="Second Steam opened. Automatic preference copy was skipped: "+ex.Message;Log(LastLaunchNotice);}
+  if(stopped)LibraryCatalog.Sync(Current);EnsureBroker();
   if(stopped&&Preferences.Current.SyncMillennium)try{MillenniumSharing.Import();}catch(IOException ex){LastLaunchNotice="Second Steam opened. Automatic add-on import was skipped: "+ex.Message;Log(LastLaunchNotice);}foreach(var broker in Process.GetProcessesByName("NativeAccountControl"))if(Image(broker).Equals(Helper,StringComparison.OrdinalIgnoreCase))AllowForeground(broker.Id);Control("open");
  }}
  public static void QuitSecond(){lock(Gate){if(!BrokerRunning()&&Status().RootIds.Length>0)EnsureBroker();if(BrokerRunning())Control("stop");}}

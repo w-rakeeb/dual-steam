@@ -74,7 +74,7 @@ public static class NativeAccountControl {
     while(true){using(var pipe=new NamedPipeServerStream(NativePaths.Identity.Pipe,PipeDirection.InOut,1,PipeTransmissionMode.Byte,PipeOptions.None,4096,4096,security)){
      pipe.WaitForConnection();var reader=new StreamReader(pipe);var writer=new StreamWriter(pipe){AutoFlush=true};
      try{string line=reader.ReadLine();if(line==null||line.Length>128)throw new Exception("Invalid control command.");
-      string[] command=line.Split(' ');if(!new[]{"open","status","focus","stop","game","close-game","ack-input","preferences","copy-arc","restore-arc","detach"}.Contains(command[0]))throw new Exception("Unsupported command.");
+      string[] command=line.Split(' ');if(!new[]{"open","status","focus","stop","game","close-game","ack-input","copy-settings","restore-settings","detach"}.Contains(command[0]))throw new Exception("Unsupported command.");
       string result;lock(OperationGate){Execute(command);result=File.ReadAllText(Root+@"\Evidence\native-control.json");}writer.WriteLine(result);
       if((command[0]=="stop"||command[0]=="detach")&&result.Contains("\"Success\":true"))return 0;
      }catch(Exception ex){try{writer.WriteLine(new JavaScriptSerializer().Serialize(new{Success=false,Error=ex.Message}));}catch{}}
@@ -85,8 +85,13 @@ public static class NativeAccountControl {
  public static int Execute(string[] args){try{
   if(WindowsIdentity.GetCurrent().User.Value!=NativePaths.Identity.SID||!String.Equals(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),Root+@"\Windows Profile",StringComparison.OrdinalIgnoreCase))throw new Exception("Unexpected Windows identity or profile.");
   string action=args.Length>0?args[0]:"status";
-  if(action=="preferences"){Write(new{Success=true,Info=GameSharing.Describe()});return 0;}
-  if(action=="copy-arc"||action=="restore-arc"){Write(new{Success=true,Info=GameSharing.Apply(action=="restore-arc")});return 0;}
+  if(action=="copy-settings"||action=="restore-settings"){
+   if(Games().Any())throw new IOException("Close games in Second Steam before copying or restoring settings.");
+   string history=Path.Combine(Root,@"Evidence\Settings Imports");string info;
+   if(action=="copy-settings"){Guid id;if(args.Length!=2||!Guid.TryParseExact(args[1],"N",out id))throw new IOException("Invalid import identifier.");info=SettingsTransfer.Apply(Path.Combine(Home,@"Data\Settings Imports",args[1]),Path.Combine(Root,"Windows Profile"),history);}
+   else info=SettingsTransfer.Restore(Path.Combine(Root,"Windows Profile"),history);
+   Write(new{Success=true,Info=info});return 0;
+  }
   if(action=="detach"){Write(new{Success=true});return 0;}
   var clients=Clients();var roots=clients.Where(p=>p.ProcessName.Equals("steam",StringComparison.OrdinalIgnoreCase)).ToArray();
   if(action=="open"){
