@@ -2,7 +2,7 @@
 
 Two independent Steam logins on one Windows desktop, with separate account data and shared installed game libraries.
 
-**Windows 10 / Windows 11, x64 · .NET Framework 4.8 · Version 3.1.1**
+**Windows 10 / Windows 11, x64 · .NET Framework 4.8 · Version 3.2.0**
 
 [Download the latest release](https://github.com/w-rakeeb/dual-steam/releases/latest)
 
@@ -90,3 +90,11 @@ On Windows x64 with .NET Framework 4.8:
 The build produces the manager, updater and native controller. The package script uses an explicit runtime-file allowlist and excludes private data. Source code is MIT licensed. Steam names, logos and other trademarks belong to Valve; the artwork source is documented in `Assets/SOURCE.md`.
 
 Medal integration is left unchanged during launch. The optional compatibility control is troubleshooting only, not a requirement or a confirmed diagnosis. Main Steam, Second Steam and the manager have distinct taskbar identities; desktop and recognized pinned shortcuts are repaired by Add / repair desktop shortcuts.
+
+## Remove a configured setup
+
+In Settings → General, choose **Remove Dual Steam setup**. The preview lists the managed account and second-client folder, requires backup acknowledgment, and requests Windows administrator approval. Quit Second Steam and its games first. Removal verifies the Windows SID/profile, refuses shared-library/Main Steam overlaps, waits for profile release, removes only the configured account/client/profile/bootstrap backup, restores an enabled Medal compatibility block, and clears setup data and Second Steam shortcuts. Child junctions are unlinked without traversing their targets. Interrupted removal retains recovery records; Windows locks or an unverified profile stop removal rather than forcing it.
+
+This removes the configured second setup. The portable manager, source and historical app backups stay available; delete the extracted manager folder separately to remove those. Export any local saves/settings before confirming. Other manually created profiles or unrecorded legacy folders are not discovered by name and deleted.
+
+Update checks now have a visible progress state, disabled repeat action, persistent result, installed/public versions and a last-checked timestamp. Failed checks clear stale install actions. New settings-import backups are checksummed before restore; older receipts remain readable. Diagnostic reports use the actual installed version.

@@ -1,4 +1,59 @@
-param([Parameter(Mandatory=$true)][string]$Request)
+param([Parameter(Mandatory=$true)][string]$Request,[switch]$Remove)
+if($Remove){
+$ErrorActionPreference='Stop'
+$env:PSModulePath=Join-Path $PSHOME 'Modules'
+$project=Split-Path $PSScriptRoot -Parent
+$state=Join-Path $project 'Data\Removal'
+$result=Join-Path $state 'result.json'
+$removeMutex=$null;$removeHeld=$false;$safeResult=$false
+try{
+ [void][Reflection.Assembly]::LoadFrom((Join-Path $project 'Dual Steam.exe'))
+ [SettingsTransfer]::NoLinks($state);[SettingsTransfer]::NoLinks($result);$safeResult=$true
+ if([IO.Path]::GetFullPath($Request) -ne (Join-Path $state 'request.json')){throw 'Unexpected removal request path'}
+ [SettingsTransfer]::NoLinks($Request)
+ $r=Get-Content -LiteralPath $Request -Raw -Encoding UTF8 | ConvertFrom-Json
+ $p=New-Object RemovalPlan
+ foreach($name in 'Home','Root','Profile','MainSteam','User','SID','IssuerSID','OriginalProfileBackup','Libraries'){$p.$name=$r.$name}
+ $index=Join-Path (Split-Path $r.MainSteam -Parent) 'steamapps\libraryfolders.vdf'
+ if(Test-Path -LiteralPath $index){if((Get-Item -LiteralPath $index).Length -gt 1048576){throw 'Main Steam library index is too large'};$p.Libraries=@($p.Libraries)+@([LibraryCatalog]::ReadPaths([IO.File]::ReadAllText($index)))}
+ [RemovalCore]::Validate($p,$r.IssuerSID)
+ $sha=[Security.Cryptography.SHA256]::Create();try{$lock=([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($r.Root.TrimEnd('\').ToLowerInvariant())))).Replace('-','').Substring(0,16)}finally{$sha.Dispose()}
+ $removeMutex=New-Object Threading.Mutex($false,('Global\DualSteamSetup_'+$lock));try{$removeHeld=$removeMutex.WaitOne(0)}catch [Threading.AbandonedMutexException]{$removeHeld=$true};if(!$removeHeld){throw 'Setup or removal for this folder is already running'}
+ if($r.Home -ne $project){throw 'Removal request belongs to another app folder'}
+ $account=Get-Content -LiteralPath (Join-Path $project 'Data\Native\account.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+ if($account.SID -ne $r.SID -or $account.User -ne $r.User -or $account.Profile -ne $r.Profile -or $account.IssuerSID -ne $r.IssuerSID -or [string]$account.OriginalProfileBackup -ne [string]$r.OriginalProfileBackup -or $account.ManagedBy -notlike 'Dual Steam*'){throw 'The managed account record changed'}
+ $user=Get-LocalUser -Name $r.User -ErrorAction SilentlyContinue
+ if($user -and $user.SID.Value -ne $r.SID){throw 'An unrelated Windows account has this name'}
+ $marker='HKLM:\SOFTWARE\DualSteamManagedRemoval\'+$r.SID
+ $trusted=if(Test-Path -LiteralPath $marker){Get-ItemProperty -LiteralPath $marker}else{$null}
+ if($trusted -and ($trusted.Root -ne $r.Root -or $trusted.Profile -ne $r.Profile -or $trusted.User -ne $r.User -or $trusted.IssuerSID -ne $r.IssuerSID)){throw 'The protected removal recovery record does not match this setup'}
+ if(!$user -and !$trusted){throw 'The managed Windows account is missing. No unverified folder was removed.'}
+ $issuerKey='HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\'+$r.IssuerSID
+ $issuerProfile=[Environment]::ExpandEnvironmentVariables((Get-ItemProperty -LiteralPath $issuerKey).ProfileImagePath).TrimEnd('\')
+ if($issuerProfile -eq $r.Root -or $issuerProfile.StartsWith($r.Root+'\',[StringComparison]::OrdinalIgnoreCase) -or $issuerProfile -eq $r.OriginalProfileBackup){throw 'Removal would affect the setup owner profile'}
+ $admins=Get-LocalGroup -SID 'S-1-5-32-544'
+ if($user -and @(Get-LocalGroupMember -Group $admins | Where-Object {$_.SID.Value -eq $r.SID}).Count){throw 'The managed account is now an administrator; review it before removal'}
+ $processes=Get-CimInstance Win32_Process
+ foreach($process in $processes){if($process.ExecutablePath -and $process.ExecutablePath.StartsWith($r.Root+'\',[StringComparison]::OrdinalIgnoreCase)){throw 'A program still uses the second-client folder. Close it before removal'};$owner=Invoke-CimMethod -InputObject $process -MethodName GetOwnerSid -ErrorAction SilentlyContinue;if($owner.Sid -eq $r.SID){throw 'A process still uses the second Windows account. Close its programs, or restart Windows, before removal'}}
+ $profile=Get-CimInstance Win32_UserProfile | Where-Object {$_.SID -eq $r.SID}
+ if(!$profile -and !$trusted){throw 'Windows could not verify the managed profile location. No folder was removed.'}
+ if($profile){if($profile.Special -or [IO.Path]::GetFullPath($profile.LocalPath).TrimEnd('\') -ne $r.Profile){throw 'The managed Windows profile has an unexpected location'};$limit=(Get-Date).AddSeconds(20);while($profile.Loaded -and (Get-Date) -lt $limit){Start-Sleep -Milliseconds 500;$profile=Get-CimInstance Win32_UserProfile | Where-Object {$_.SID -eq $r.SID}};if($profile.Loaded){throw 'Windows is still using the second profile. Restart Windows and retry removal.'}}
+ if(!$trusted){New-Item -Path $marker -Force|Out-Null;$acl=New-Object Security.AccessControl.RegistrySecurity;$acl.SetAccessRuleProtection($true,$false);foreach($sid in 'S-1-5-18','S-1-5-32-544'){$identity=New-Object Security.Principal.SecurityIdentifier($sid);$rule=New-Object Security.AccessControl.RegistryAccessRule($identity,'FullControl','ContainerInherit','None','Allow');$acl.AddAccessRule($rule)};Set-Acl -LiteralPath $marker -AclObject $acl;foreach($name in 'Root','Profile','User','IssuerSID'){New-ItemProperty -LiteralPath $marker -Name $name -Value $r.$name -PropertyType String -Force|Out-Null}}
+ if($profile){[RemovalCore]::UnlinkProfileLinks($r.Profile);Remove-CimInstance -InputObject $profile}
+ if(Test-Path -LiteralPath ('Registry::HKEY_USERS\'+$r.SID)){throw 'Windows still has the second profile registry loaded. Restart Windows and retry.'}
+ [RemovalCore]::DeleteTree($r.Root)
+ if($r.OriginalProfileBackup){[RemovalCore]::DeleteTree($r.OriginalProfileBackup)}
+ foreach($folder in @($project,(Join-Path $project 'Assets'),(Join-Path $project 'Data'),(Join-Path $project 'Tools'))){[SettingsTransfer]::NoLinks($folder);$acl=Get-Acl -LiteralPath $folder;foreach($rule in $acl.GetAccessRules($true,$false,[Security.Principal.SecurityIdentifier])){if($rule.IdentityReference.Value -eq $r.SID){$acl.RemoveAccessRuleSpecific($rule)}};Set-Acl -LiteralPath $folder -AclObject $acl}
+ if($user){Remove-LocalUser -SID $user.SID}
+ if(Get-LocalUser -Name $r.User -ErrorAction SilentlyContinue){throw 'The managed Windows account could not be removed'}
+ @{Success=$true;AccountRemoved=$r.User;SID=$r.SID;RootRemoved=$r.Root}|ConvertTo-Json|Set-Content -LiteralPath $result -Encoding UTF8
+ Remove-Item -LiteralPath $marker
+ exit 0
+}catch{
+ if($safeResult){@{Success=$false;Error=$_.Exception.Message;Recovery='Keep Data/Native and Data/Removal for retry. Do not manually delete shared Steam libraries.'}|ConvertTo-Json|Set-Content -LiteralPath $result -Encoding UTF8}
+ exit 1
+}finally{if($removeMutex){if($removeHeld){$removeMutex.ReleaseMutex()};$removeMutex.Dispose()}}
+}
 $ErrorActionPreference='Stop'
 $env:PSModulePath=Join-Path $PSHOME 'Modules'
 $project=Split-Path $PSScriptRoot -Parent
