@@ -20,7 +20,7 @@ public static class NativeAccountControl {
  static readonly object OperationGate=new object();static DateTime missingManager=DateTime.MinValue;
  static void WatchManager(){try{bool running=RuntimeAuthorization.Valid(Home);if(running){missingManager=DateTime.MinValue;return;}if(missingManager==DateTime.MinValue){missingManager=DateTime.UtcNow;return;}if((DateTime.UtcNow-missingManager).TotalSeconds<10)return;lock(OperationGate){if(Execute(new[]{"stop"})==0)Environment.Exit(0);}}catch{}}
  static string Home{get{return NativePaths.Home;}}
- static IntPtr SteamWindow(Process[] clients,bool primaryOnly=false){var ids=clients.Select(p=>p.Id).ToArray();IntPtr best=IntPtr.Zero;long area=0;EnumWindows(delegate(IntPtr h,IntPtr state){uint pid;GetWindowThreadProcessId(h,out pid);if(!ids.Contains((int)pid))return true;var title=new StringBuilder(256);var kind=new StringBuilder(128);GetWindowText(h,title,256);GetClassName(h,kind,128);Rect rect;if(kind.ToString()=="SDL_app"&&(title.ToString()=="Steam"||title.ToString()=="Second Steam")){best=h;return false;}if(!primaryOnly&&IsWindowVisible(h)&&title.Length>0&&GetWindowRect(h,out rect)){long size=(long)(rect.Right-rect.Left)*(rect.Bottom-rect.Top);if(size>area){best=h;area=size;}}return true;},IntPtr.Zero);return best;}
+ static IntPtr SteamWindow(Process[] clients,bool primaryOnly=false){var ids=clients.Select(p=>p.Id).ToArray();IntPtr best=IntPtr.Zero;long area=0;EnumWindows(delegate(IntPtr h,IntPtr state){uint pid;GetWindowThreadProcessId(h,out pid);if(!ids.Contains((int)pid))return true;var title=new StringBuilder(256);var kind=new StringBuilder(128);GetWindowText(h,title,256);GetClassName(h,kind,128);Rect rect;if(kind.ToString()=="SDL_app"&&(title.ToString()=="Steam"||title.ToString()=="Second Steam")){best=h;return false;}if((IsWindowVisible(h)||kind.ToString()=="Chrome_WidgetWin_1"||kind.ToString()=="SDL_app")&&title.Length>0&&GetWindowRect(h,out rect)&&rect.Right-rect.Left>=200&&rect.Bottom-rect.Top>=100){long size=(long)(rect.Right-rect.Left)*(rect.Bottom-rect.Top);if(size>area){best=h;area=size;}}return true;},IntPtr.Zero);return best;}
  static string WindowTaskbarId(IntPtr h){try{return h==IntPtr.Zero?"":DualSteamNative.SteamTaskbarIdentity.ReadId(h);}catch{return "unavailable";}}
  static void UpdateIdentity(){lock(IdentityGate){try{bool enabled=!File.Exists(Path.Combine(Home,@"Data\separate-taskbar.off"));identity.Update(Clients(),enabled);}catch{}}}
  [DllImport("user32")]static extern bool EnumWindows(Callback cb,IntPtr state);
@@ -58,7 +58,7 @@ public static class NativeAccountControl {
   }
   return tracked.Where(item=>app==0||item.Value.Item1==app).Select(item=>{try{var process=Process.GetProcessById(item.Key);return Own(process)&&Math.Abs((process.StartTime-item.Value.Item2).TotalSeconds)<15?process:null;}catch{return null;}}).Where(p=>p!=null).ToArray();
  }
- static void Write(object value){File.WriteAllText(Root+@"\Evidence\native-control.json",new JavaScriptSerializer().Serialize(value));}
+ static void Write(object value){Directory.CreateDirectory(Root+@"\Evidence");File.WriteAllText(Root+@"\Evidence\native-control.json",new JavaScriptSerializer().Serialize(value));}
  public static int Main(string[] args){try{if(args.Length!=2||args[0]!="broker")return 2;NativePaths.Initialize(args[1]);return Broker(NativePaths.Identity.IssuerSID);}catch(Exception ex){try{Directory.CreateDirectory(Root+@"\Evidence");File.WriteAllText(Root+@"\Evidence\controller-error.txt",ex.Message);}catch{}return 1;}}
  static int Broker(string issuer){
   if(WindowsIdentity.GetCurrent().User.Value!=NativePaths.Identity.SID)return 1;
@@ -101,7 +101,8 @@ public static class NativeAccountControl {
    if(roots.Length>1)throw new Exception("Duplicate native clients found; close extras before continuing.");
    Environment.SetEnvironmentVariable("steam_master_ipc_name_override",null);
    if(roots.Length==0){
-    Process.Start(new ProcessStartInfo(Client+"steam.exe","-master_ipc_name_override "+Ipc){UseShellExecute=false,WorkingDirectory=Client});
+    // Reusing the IPC override on a running client can spawn another instance.
+    Process.Start(new ProcessStartInfo(Client+"steam.exe","-master_ipc_name_override "+Ipc+" -foreground steam://open/main"){UseShellExecute=false,WorkingDirectory=Client});
     action="focus";
    }
    action="focus";
@@ -130,7 +131,7 @@ public static class NativeAccountControl {
   }
   if(action=="focus"){
    IntPtr best=IntPtr.Zero;for(int attempt=0;attempt<40;attempt++){clients=Clients();best=SteamWindow(clients,true);if(best!=IntPtr.Zero)break;Thread.Sleep(400);}
-   if(best==IntPtr.Zero)throw new Exception("Steam is running but its interface is not ready. Wait for its update/sign-in, then use Focus again. No extra client was started.");
+   if(best==IntPtr.Zero){if(!Clients().Any(p=>p.ProcessName.Equals("steam",StringComparison.OrdinalIgnoreCase)))throw new IOException("Steam exited before opening its interface. Check the Second Steam client logs from Files, then try Open again. Main Steam was not closed.");Write(new{Success=true,RootIds=Clients().Where(p=>p.ProcessName.Equals("steam",StringComparison.OrdinalIgnoreCase)).Select(p=>p.Id).ToArray(),WindowReady=false,Info="Steam is preparing its interface. Its first download or update can take several minutes. Use Open / Focus again to reopen it. If it stays unavailable, save a diagnostic report from Settings."});return 0;}
    ShowWindowAsync(best,9);SetForegroundWindow(best);UpdateIdentity();
   }
   if(action=="game"){

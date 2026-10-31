@@ -21,7 +21,7 @@ public partial class App {
  }
  void CopySettings(){if(settingsScan==null){toast.Show("Scan a game folder first.");return;}if(Engine.Current==null){toast.Show("Set up Second Steam first.");return;}var scan=settingsScan;var selected=scan.Files.Where(f=>f.Selected).ToArray();if(selected.Length==0){toast.Show("Select the files you want to copy.");return;}string custom=destinationInput.Text;
   string preview=String.Join("\n",selected.Take(8).Select(f=>Path.GetFileName(f.Source)+" → "+(String.IsNullOrWhiteSpace(custom)?f.Relative:custom)))+(selected.Length>8?"\n…":"");
-  if(MessageBox.Show(window,"Copy "+selected.Length+" complete settings files into Second Steam's Windows profile? Existing files will be backed up.\n\n"+preview,"Review settings import",MessageBoxButton.YesNo,MessageBoxImage.Question)!=MessageBoxResult.Yes)return;
+  if(AppDialog.Show(window,"Copy "+selected.Length+" complete settings files into Second Steam's Windows profile? Existing files will be backed up.\n\n"+preview,"Review settings import",MessageBoxButton.YesNo,MessageBoxImage.Question)!=MessageBoxResult.Yes)return;
   Act(()=>{string result=SettingsScanner.Copy(scan,selected,custom);Dispatcher.Invoke(()=>{settingsScan=null;if(page=="Sharing"){scanResults.Children.Clear();scanSummary.Text="Import complete. Scan again before copying more files.";sharingStatus.Text=result;}});},"Selected settings copied.");
  }
 }

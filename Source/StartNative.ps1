@@ -2,6 +2,9 @@ $ErrorActionPreference='Stop'
  $project=Split-Path $PSScriptRoot -Parent
 $settings=Get-Content -LiteralPath "$project\Data\settings.json" -Raw -Encoding UTF8 | ConvertFrom-Json
 $native=$settings.NativeRoot
+if(Test-Path -LiteralPath "$project\Data\Removal\request.json"){throw 'A removal is unfinished. Open Settings and finish removing the setup before creating it again.'}
+if(!(Test-Path -LiteralPath "$native\Client\steam.exe")){throw 'The Second Steam client is missing. Finish removal in Settings, then set up Second Steam again.'}
+New-Item -ItemType Directory -Path "$native\Evidence" -Force | Out-Null
 $account=Get-Content -LiteralPath "$project\Data\Native\account.json" -Raw -Encoding UTF8 | ConvertFrom-Json
 if([Security.Principal.WindowsIdentity]::GetCurrent().User.Value -ne $account.IssuerSID){throw 'Use the Windows account that created this profile'}
 $password=(Get-Content -LiteralPath "$project\Data\Native\password.dpapi" -Raw -Encoding UTF8).Trim() | ConvertTo-SecureString

@@ -1,5 +1,7 @@
 using System;using System.IO;using System.Linq;using System.Diagnostics;using System.Security.Principal;using System.Web.Script.Serialization;using System.Collections.Generic;using System.Security.AccessControl;
 public static class RemovalService {
+ public static bool Pending{get{return File.Exists(Path.Combine(Engine.Home,@"Data\Removal\request.json"));}}
+ public static void RequireComplete(){if(Pending)throw new IOException("Removal has not finished. Open Settings → General → Finish removing setup. Keep the recovery records; after removal succeeds you can create Second Steam again.");}
  public static RemovalPlan Preview(){
   if(Engine.Current==null)throw new IOException("No configured Second Steam setup was found.");var account=Engine.Account();string file=Path.Combine(Engine.Home,@"Data\Native\account.json");var metadata=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(File.ReadAllText(file));
   object managed;if(!metadata.TryGetValue("ManagedBy",out managed)||!Convert.ToString(managed).StartsWith("Dual Steam",StringComparison.Ordinal))throw new IOException("The account is not marked as managed by Dual Steam.");object seed;metadata.TryGetValue("OriginalProfileBackup",out seed);
@@ -12,6 +14,7 @@ public static class RemovalService {
   var status=Engine.Status();if((status.RootIds??new int[0]).Length>0||(status.GameIds??new int[0]).Length>0)throw new IOException("Quit Second Steam and its games before removing setup. Main Steam can stay open.");
   if(MedalCompatibility.Enabled)MedalCompatibility.Restore();
   try{Engine.Control("detach");}catch(TimeoutException){}
+  foreach(var broker in Process.GetProcessesByName("NativeAccountControl"))using(broker){if(Engine.Image(broker).Equals(Engine.Helper,StringComparison.OrdinalIgnoreCase)&&!broker.WaitForExit(10000))throw new IOException("The background controller is still closing. Wait a moment and retry removal.");}
   string state=Path.Combine(Engine.Home,@"Data\Removal");Directory.CreateDirectory(state);SettingsTransfer.NoLinks(state);string request=Path.Combine(state,"request.json"),result=Path.Combine(state,"result.json");File.WriteAllText(request,new JavaScriptSerializer().Serialize(plan));if(File.Exists(result))File.Delete(result);
   var process=Process.Start(new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),@"WindowsPowerShell\v1.0\powershell.exe"),"-NoProfile -ExecutionPolicy Bypass -File "+Engine.Quote(Path.Combine(Engine.Home,@"Source\Setup-Elevated.ps1"))+" -Remove -Request "+Engine.Quote(request)){UseShellExecute=true,Verb="runas",WindowStyle=ProcessWindowStyle.Hidden});
   using(process){if(!process.WaitForExit(300000))throw new IOException("Removal is still running. Wait for its result in Data / Removal before retrying. Do not start a new setup yet.");if(process.ExitCode!=0){string message="Removal did not finish. The recovery records were kept.";if(File.Exists(result)){var details=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(File.ReadAllText(result));if(details.ContainsKey("Error"))message+=" "+Convert.ToString(details["Error"]);}throw new IOException(message);}}
@@ -20,6 +23,6 @@ public static class RemovalService {
  static void FinishLocal(RemovalPlan plan){
   DesktopAccess.Revoke(plan.SID);
   Engine.Run(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),@"WindowsPowerShell\v1.0\powershell.exe"),"-NoProfile -ExecutionPolicy Bypass -File "+Engine.Quote(Path.Combine(Engine.Home,@"Source\Create-Shortcuts.ps1"))+" -RemoveSecond");
-  Engine.Current=null;RemovalCore.DeleteTree(Path.Combine(Engine.Home,"Data"));Preferences.Current=new Preferences();Preferences.Save();
+  RemovalCore.DeleteTree(Path.Combine(Engine.Home,"Data"));Engine.Current=null;Preferences.Current=new Preferences();Preferences.Save();
  }
 }

@@ -2,7 +2,7 @@
 
 Two independent Steam logins on one Windows desktop, with separate account data and shared installed game libraries.
 
-**Windows 10 / Windows 11, x64 · .NET Framework 4.8 · Version 3.3.0**
+**Windows 10 / Windows 11, x64 · .NET Framework 4.8 · Version 3.3.1**
 
 [Download the latest release](https://github.com/w-rakeeb/dual-steam/releases/latest)
 
@@ -59,7 +59,7 @@ THE FINALS and Among Us local folders can be detected for inspection, but their 
 
 ## Background mode and tray menus
 
-The public build requires an authorized manager session. an explicit manager exit closes Second Steam; if the manager disappears unexpectedly, the controller closes the second client and its verified tracked games after a short grace period. Save your game before exiting. Main Steam remains independent.
+The public build requires an authorized manager session. An explicit manager exit closes Second Steam; if the manager disappears unexpectedly, the controller closes the second client and its verified tracked games after a short grace period. Save your game before exiting. Main Steam remains independent.
 
 Dual Steam's own tray controls follow its selected theme. Steam's original native tray icon/menu can remain alongside them; Explorer internals are not patched or injected.
 
@@ -90,6 +90,17 @@ On Windows x64 with .NET Framework 4.8:
 The build produces the manager, updater and native controller. The package script uses an explicit runtime-file allowlist and excludes private data. Source code is MIT licensed. Steam names, logos and other trademarks belong to Valve; the artwork source is documented in `Assets/SOURCE.md`.
 
 Medal integration is left unchanged during launch. The optional compatibility control is troubleshooting only, not a requirement or a confirmed diagnosis. Main Steam, Second Steam and the manager have distinct taskbar identities; desktop and recognized pinned shortcuts are repaired by Add / repair desktop shortcuts.
+
+## Version 3.3.1 recovery fixes
+
+- Hidden, sign-in and update windows are detected and restored without starting a duplicate client. A first download remains a starting state; an exited client reports a launch failure.
+- The controller creates its Evidence directory before writing startup records. An unfinished removal blocks launches and offers **Settings → General → Finish removing setup** instead of recreating a broken client folder.
+- Removal clears read-only Windows directories (including WinX/Group1), waits for the controller to exit, checks process ownership directly, and allows briefly exiting processes to finish before reporting a named blocker. Shared libraries and Main Steam remain protected.
+- In-app dialogs follow Dark/Light themes, support copying error details, and default confirmation keyboard actions to No. Tray controls use matching colors, spacing, icons and separators.
+
+If a 3.3.0 removal failed, update first. Back up any remaining second-profile saves, finish removal, then create a fresh setup. This cannot restore data already deleted by the earlier removal. Do not delete recovery records manually.
+
+Validation: 78 automated checks, clean extracted-folder setup, hidden sign-in restoration, repeat setup/removal, pending-removal launch blocking, live removal UI, and dark/light dialog and tray renders on the development Windows 11 PC. Windows 10 and the recipient's PC still require their own runtime confirmation.
 
 ## Remove a configured setup
 
