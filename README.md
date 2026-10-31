@@ -2,7 +2,7 @@
 
 Two independent Steam logins on one Windows desktop, with separate account data and shared installed game libraries.
 
-**Windows 10 / Windows 11, x64 · .NET Framework 4.8 · Version 3.2.0**
+**Windows 10 / Windows 11, x64 · .NET Framework 4.8 · Version 3.3.0**
 
 [Download the latest release](https://github.com/w-rakeeb/dual-steam/releases/latest)
 
@@ -24,11 +24,11 @@ You stay on your current Windows desktop. No Sandboxie, virtual machine or manua
 | Profiles | Open, focus and quit Second Steam; recover hidden Library windows; identify an interface still starting |
 | Performance | Client process count, summed working-set memory, sampled CPU, root PID and uptime; games are separate |
 | Appearance | Dark, Light and System themes; equal-sized Steam artwork; distinct second-client taskbar identity and icon |
-| Background | Close manager to tray; optional second-client tray control; selectable independent or manager-required operation |
+| Background | Close manager to tray; optional second-client tray control; authorized manager session required |
 | Libraries | Detect existing libraries on any drive, including the system drive when selected; no copying entire games |
 | Sharing | Dynamic game-folder discovery, manual settings-folder selection, per-file review/copy/restore; detected Millennium imports |
 | Maintenance | Repair shortcuts, reset manager preferences, scan text settings, save diagnostics and restore the last settings import |
-| Updates | Automatic startup/six-hour checks, manual checking, available-update prompt and SHA-256-verified installation with backups |
+| Updates | Signed startup availability and mandatory stable releases; optional session notifications; verified installation and rollback |
 
 The Second Steam shortcut starts/focuses the client with the dashboard hidden. Reopening the manager shortcut restores the same dashboard instead of starting another copy.
 
@@ -59,7 +59,7 @@ THE FINALS and Among Us local folders can be detected for inspection, but their 
 
 ## Background mode and tray menus
 
-Independent operation is enabled by default. Turn off **Keep Second Steam running after the manager exits** to require the manager. In that mode, an explicit manager exit closes Second Steam; if the manager disappears unexpectedly, the controller closes the second client and its verified tracked games after a short grace period. Save your game before exiting. Main Steam remains independent.
+The public build requires an authorized manager session. an explicit manager exit closes Second Steam; if the manager disappears unexpectedly, the controller closes the second client and its verified tracked games after a short grace period. Save your game before exiting. Main Steam remains independent.
 
 Dual Steam's own tray controls follow its selected theme. Steam's original native tray icon/menu can remain alongside them; Explorer internals are not patched or injected.
 
@@ -98,3 +98,24 @@ In Settings → General, choose **Remove Dual Steam setup**. The preview lists t
 This removes the configured second setup. The portable manager, source and historical app backups stay available; delete the extracted manager folder separately to remove those. Export any local saves/settings before confirming. Other manually created profiles or unrecorded legacy folders are not discovered by name and deleted.
 
 Update checks now have a visible progress state, disabled repeat action, persistent result, installed/public versions and a last-checked timestamp. Failed checks clear stale install actions. New settings-import backups are checksummed before restore; older receipts remain readable. Diagnostic reports use the actual installed version.
+## Screenshots
+
+Captured from the Windows app at 960 px; closed profiles represent an idle interface.
+
+| Profiles and performance | Game-settings discovery |
+| --- | --- |
+| ![Profiles and performance](docs/screenshots/profiles.png) | ![Dynamic game settings](docs/screenshots/sharing.png) |
+
+| Updates | Appearance |
+| --- | --- |
+| ![Updates](docs/screenshots/updates.png) | ![Appearance](docs/screenshots/appearance.png) |
+
+Example startup announcement (illustration of the real app screen, **not** the current live service status):
+
+![Example temporary-pause announcement](docs/screenshots/startup-announcement.png)
+
+## Startup availability and required updates
+
+Official builds from v3.3.0 verify a signed GitHub announcement on each full manager startup. All stable public releases are required at the next startup: an outdated build cannot authorize Second Steam until updated. A paused or closed service shows the publisher's announcement. An already authorized open session continues working; closing to the tray keeps it open, while full exit ends the session. Internet is required for a new startup. Settings/removal remain available, and Main Steam stays independent.
+
+The public build requires its manager session. Separate desktop shortcuts still work by opening the manager silently before Second Steam. There is no telemetry or statistics service. Older/modified builds cannot be retroactively revoked. See [publisher controls](Publisher/README.md) for Active / Paused / Closed controls and announcements. Closing the publisher's local app does not disable other PCs; the GitHub control workflow changes the policy.

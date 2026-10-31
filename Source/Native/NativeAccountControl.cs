@@ -18,7 +18,7 @@ public static class NativeAccountControl {
  static string Ipc {get{return "DualSteam_"+NativePaths.Identity.SID.Replace("-","");}}
  static readonly object IdentityGate=new object();static DualSteamNative.SteamTaskbarIdentity identity;
  static readonly object OperationGate=new object();static DateTime missingManager=DateTime.MinValue;
- static void WatchManager(){try{if(!File.Exists(Path.Combine(Home,@"Data\require-manager.on"))){missingManager=DateTime.MinValue;return;}bool running=Process.GetProcessesByName("Dual Steam").Any(p=>Image(p).Equals(Path.Combine(Home,"Dual Steam.exe"),StringComparison.OrdinalIgnoreCase));if(running){missingManager=DateTime.MinValue;return;}if(missingManager==DateTime.MinValue){missingManager=DateTime.UtcNow;return;}if((DateTime.UtcNow-missingManager).TotalSeconds<10)return;lock(OperationGate){if(Execute(new[]{"stop"})==0)Environment.Exit(0);}}catch{}}
+ static void WatchManager(){try{bool running=RuntimeAuthorization.Valid(Home);if(running){missingManager=DateTime.MinValue;return;}if(missingManager==DateTime.MinValue){missingManager=DateTime.UtcNow;return;}if((DateTime.UtcNow-missingManager).TotalSeconds<10)return;lock(OperationGate){if(Execute(new[]{"stop"})==0)Environment.Exit(0);}}catch{}}
  static string Home{get{return NativePaths.Home;}}
  static IntPtr SteamWindow(Process[] clients,bool primaryOnly=false){var ids=clients.Select(p=>p.Id).ToArray();IntPtr best=IntPtr.Zero;long area=0;EnumWindows(delegate(IntPtr h,IntPtr state){uint pid;GetWindowThreadProcessId(h,out pid);if(!ids.Contains((int)pid))return true;var title=new StringBuilder(256);var kind=new StringBuilder(128);GetWindowText(h,title,256);GetClassName(h,kind,128);Rect rect;if(kind.ToString()=="SDL_app"&&(title.ToString()=="Steam"||title.ToString()=="Second Steam")){best=h;return false;}if(!primaryOnly&&IsWindowVisible(h)&&title.Length>0&&GetWindowRect(h,out rect)){long size=(long)(rect.Right-rect.Left)*(rect.Bottom-rect.Top);if(size>area){best=h;area=size;}}return true;},IntPtr.Zero);return best;}
  static string WindowTaskbarId(IntPtr h){try{return h==IntPtr.Zero?"":DualSteamNative.SteamTaskbarIdentity.ReadId(h);}catch{return "unavailable";}}
@@ -74,7 +74,7 @@ public static class NativeAccountControl {
     while(true){using(var pipe=new NamedPipeServerStream(NativePaths.Identity.Pipe,PipeDirection.InOut,1,PipeTransmissionMode.Byte,PipeOptions.None,4096,4096,security)){
      pipe.WaitForConnection();var reader=new StreamReader(pipe);var writer=new StreamWriter(pipe){AutoFlush=true};
      try{string line=reader.ReadLine();if(line==null||line.Length>128)throw new Exception("Invalid control command.");
-      string[] command=line.Split(' ');if(!new[]{"open","status","focus","stop","game","close-game","ack-input","copy-settings","restore-settings","detach"}.Contains(command[0]))throw new Exception("Unsupported command.");
+      string[] command=line.Split(' ');if(!new[]{"open","status","focus","stop","game","close-game","ack-input","copy-settings","restore-settings","detach","verify-session"}.Contains(command[0]))throw new Exception("Unsupported command.");
       string result;lock(OperationGate){Execute(command);result=File.ReadAllText(Root+@"\Evidence\native-control.json");}writer.WriteLine(result);
       if((command[0]=="stop"||command[0]=="detach")&&result.Contains("\"Success\":true"))return 0;
      }catch(Exception ex){try{writer.WriteLine(new JavaScriptSerializer().Serialize(new{Success=false,Error=ex.Message}));}catch{}}
@@ -85,6 +85,8 @@ public static class NativeAccountControl {
  public static int Execute(string[] args){try{
   if(WindowsIdentity.GetCurrent().User.Value!=NativePaths.Identity.SID||!String.Equals(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),Root+@"\Windows Profile",StringComparison.OrdinalIgnoreCase))throw new Exception("Unexpected Windows identity or profile.");
   string action=args.Length>0?args[0]:"status";
+  if(action!="status"&&action!="stop"&&action!="detach")RuntimeAuthorization.Require(Home);
+  if(action=="verify-session"){Write(new{Success=true,Info="Authorized manager session accepted by the second Windows account."});return 0;}
   if(action=="copy-settings"||action=="restore-settings"){
    if(Games().Any())throw new IOException("Close games in Second Steam before copying or restoring settings.");
    string history=Path.Combine(Root,@"Evidence\Settings Imports");string info;
