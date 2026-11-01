@@ -2,7 +2,7 @@
 
 Two independent Steam logins on one Windows desktop, with separate account data and shared installed game libraries.
 
-**Windows 10 / Windows 11, x64 · .NET Framework 4.8 · Version 3.3.3**
+**Windows 10 / Windows 11, x64 · .NET Framework 4.8 · Version 3.4.0**
 
 [Download the latest release](https://github.com/w-rakeeb/dual-steam/releases/latest)
 
@@ -91,6 +91,17 @@ The build produces the manager, updater and native controller. The package scrip
 
 Medal integration is left unchanged during launch. The optional compatibility control is troubleshooting only, not a requirement or a confirmed diagnosis. Main Steam, Second Steam and the manager have distinct taskbar identities; desktop and recognized pinned shortcuts are repaired by Add / repair desktop shortcuts.
 
+## Version 3.4.0 stability and desktop controls
+
+- **Independent startup:** the second Windows account's Steam registry path is initialized to its own client before launching. Millennium reads that per-user registry path on Windows ([upstream v3.6.2 source](https://github.com/SteamClientHomebrew/Millennium/blob/v3.6.2/src/system/filesystem.cc)). A generic Steam URL is no longer passed during second-client startup. Use the manager/tray profile controls for the correct IPC route, especially when opening Main Steam after Second Steam.
+- **Scoped shutdown:** client stops are rechecked against the managed Windows SID and client folder. Steam launcher/helper processes are excluded from game-log shutdown targets. The root client stops before helpers, lingering owned helpers are drained, and reconnect waits for an exiting controller rather than using a stale pipe.
+- **Millennium recovery:** imports disable automatic Millennium/plugin/theme update preferences in the second copy. Disabling the imported loader also disables automatic re-import. If an owned imported loader exits during the first startup checks, it is backed up and disabled and one clean launch is attempted. Changed/unrecognized loaders are preserved. Import failures roll back files and their recovery record; temporary files are removed. Use Launch without Millennium or Disable imported Millennium runtime if needed. Arbitrary third-party plugins and all Millennium versions are not guaranteed compatible.
+- **Full Exit:** the tray and General settings expose Exit Dual Steam. It ends the authorized session, stops Second Steam and tracked games, removes idle controllers, and exits the manager process. Main Steam stays independent. An Exit request during a download cancels it; other critical operations finish before exit. Ending the manager through Task Manager causes the second controller to clean up after its grace period. Save games before exiting.
+- **Updates:** startup checks race two independently verified signed GitHub routes. No unsigned/offline service bypass was added. Downloads have longer connection/read timeouts, three attempts, progress, cancellation, checksum verification and persistent error feedback. A browser ZIP fallback is available. Existing older updaters may need one manual in-place replacement.
+- **Interface:** a rounded, themed tray menu groups profile controls, Settings, Check for updates, Open app folder and full Exit. Settings use cards and switch rows; maintenance actions are grouped. Text spacing, narrow-layout metrics and uptime labels are clearer. Missing Steam paths no longer crash optional add-on/performance detection.
+
+**Validation:** 111 automated checks and live Windows 11 checks for both launch orders, imported Millennium startup, quitting Second while preserving Main, normal/background/idle-controller full Exit, forced-manager cleanup, actual GitHub download/cancellation, and a disposable same-account Steam process protected from a misleading game-log PID. A deliberately failing owned loader recovered to one clean client. The temporary account was removed. Games were not re-tested in this release; Windows 10, the recipient PC and arbitrary plugin/game combinations still need confirmation.
+
 ## Version 3.3.3 complete reset recovery
 
 An interrupted legacy removal can delete the selected profile but leave its Windows account. A later launch makes Windows recreate that same SID's profile under its default Users directory, sometimes with a computer-name suffix. Previous versions incorrectly rejected that registered path as an unexpected location.
@@ -124,6 +135,16 @@ Example startup announcement (illustration of the real app screen, **not** the c
 
 ![Example temporary-pause announcement](docs/screenshots/startup-announcement.png)
 
+
+### Settings and tray controls
+
+| General settings | Millennium and compatibility |
+| --- | --- |
+| ![Organized General settings](docs/screenshots/settings-general.png) | ![Millennium component selection](docs/screenshots/settings-compatibility.png) |
+
+Tray-menu appearance preview (running labels shown as an example):
+
+![Grouped tray controls](docs/screenshots/tray-menu.png)
 ## Startup availability and required updates
 
 Official builds from v3.3.0 verify a signed GitHub announcement on each full manager startup. All stable public releases are required at the next startup: an outdated build cannot authorize Second Steam until updated. A paused or closed service shows the publisher's announcement. An already authorized open session continues working; closing to the tray keeps it open, while full exit ends the session. Internet is required for a new startup. Settings/removal remain available, and Main Steam stays independent.

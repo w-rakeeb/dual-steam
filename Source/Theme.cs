@@ -22,7 +22,7 @@ public static class Theme {
       {"bg.window",new[]{"#16171A","#F3F4F6"}}, {"bg.surface",new[]{"#1E2024","#FFFFFF"}},
       {"bg.surfaceRaised",new[]{"#26282D","#F8F9FB"}}, {"bg.surfaceHover",new[]{"#2C2F35","#E5E8EE"}},
       {"bg.overlay",new[]{"#80000000","#80000000"}}, {"border.subtle",new[]{"#14FFFFFF","#14000000"}},
-      {"border.strong",new[]{"#747B88","#747B88"}}, {"text.primary",new[]{"#F2F3F5","#1F2124"}},
+      {"border.menu",new[]{"#3B3D45","#D2D4DB"}}, {"border.strong",new[]{"#747B88","#747B88"}}, {"text.primary",new[]{"#F2F3F5","#1F2124"}},
       {"bg.sidebar",new[]{"#16171A","#F3F4F6"}}, {"border.sidebar",new[]{"#2AFFFFFF","#33000000"}},
       {"text.secondary",new[]{"#B5BAC1","#4E5058"}}, {"text.muted",new[]{"#9AA0AA","#60656F"}},
       {"text.disabled",new[]{"#9AA0AA","#60656F"}}, {"accent.default",new[]{"#5865F2","#5865F2"}},
@@ -48,7 +48,7 @@ public static class Theme {
       Resources["Font.App"]=new FontFamily("Segoe UI Variable, Segoe UI, "+SystemFonts.MessageFontFamily.Source);
       Resources["Font.Icons"]=new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets");Resources["Font.Mono"]=new FontFamily("Cascadia Mono, Consolas");
       double scale=1;using(var key=Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Accessibility")){if(key!=null)scale=Math.Max(1,Math.Min(2.25,Convert.ToDouble(key.GetValue("TextScaleFactor",100))/100));}
-      foreach(double size in new[]{12.0,13,14,16,20,24,32}){Resources["type."+size]=size*scale;Resources["line."+size]=(size==24?32:Math.Max(18,size))*scale;}
+      foreach(double size in new[]{12.0,13,14,16,20,24,32}){Resources["type."+size]=size*scale;Resources["line."+size]=(size==24?32:Math.Max(20,size*1.45))*scale;}
       if(Application.Current!=null && !Application.Current.Resources.MergedDictionaries.Contains(Resources)) Application.Current.Resources.MergedDictionaries.Add(Resources);
     }
     static bool SystemLight(){ using(var key=Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"))return key!=null&&Convert.ToInt32(key.GetValue("AppsUseLightTheme",0))!=0; }

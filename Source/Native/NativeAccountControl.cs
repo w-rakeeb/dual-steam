@@ -17,8 +17,8 @@ public static class NativeAccountControl {
  static readonly string Client=Root+@"\Client\";
  static string Ipc {get{return "DualSteam_"+NativePaths.Identity.SID.Replace("-","");}}
  static readonly object IdentityGate=new object();static DualSteamNative.SteamTaskbarIdentity identity;
- static readonly object OperationGate=new object();static DateTime missingManager=DateTime.MinValue;
- static void WatchManager(){try{bool running=RuntimeAuthorization.Valid(Home);if(running){missingManager=DateTime.MinValue;return;}if(missingManager==DateTime.MinValue){missingManager=DateTime.UtcNow;return;}if((DateTime.UtcNow-missingManager).TotalSeconds<10)return;lock(OperationGate){if(Execute(new[]{"stop"})==0)Environment.Exit(0);}}catch{}}
+ static readonly object OperationGate=new object();static DateTime missingManager=DateTime.MinValue;static int watching;
+ static void WatchManager(){if(Interlocked.Exchange(ref watching,1)!=0)return;try{bool running=RuntimeAuthorization.Valid(Home);if(running){missingManager=DateTime.MinValue;return;}if(missingManager==DateTime.MinValue){missingManager=DateTime.UtcNow;return;}if((DateTime.UtcNow-missingManager).TotalSeconds<10)return;lock(OperationGate){try{Execute(new[]{"stop"});}finally{if(!Clients().Any()&&!Games().Any())Environment.Exit(0);}}}catch{}finally{Interlocked.Exchange(ref watching,0);}}
  static string Home{get{return NativePaths.Home;}}
  static IntPtr SteamWindow(Process[] clients,bool primaryOnly=false){var ids=clients.Select(p=>p.Id).ToArray();IntPtr best=IntPtr.Zero;long area=0;EnumWindows(delegate(IntPtr h,IntPtr state){uint pid;GetWindowThreadProcessId(h,out pid);if(!ids.Contains((int)pid))return true;var title=new StringBuilder(256);var kind=new StringBuilder(128);GetWindowText(h,title,256);GetClassName(h,kind,128);Rect rect;if(kind.ToString()=="SDL_app"&&(title.ToString()=="Steam"||title.ToString()=="Second Steam")){best=h;return false;}if((IsWindowVisible(h)||kind.ToString()=="Chrome_WidgetWin_1"||kind.ToString()=="SDL_app")&&title.Length>0&&GetWindowRect(h,out rect)&&rect.Right-rect.Left>=200&&rect.Bottom-rect.Top>=100){long size=(long)(rect.Right-rect.Left)*(rect.Bottom-rect.Top);if(size>area){best=h;area=size;}}return true;},IntPtr.Zero);return best;}
  static string WindowTaskbarId(IntPtr h){try{return h==IntPtr.Zero?"":DualSteamNative.SteamTaskbarIdentity.ReadId(h);}catch{return "unavailable";}}
@@ -45,7 +45,7 @@ public static class NativeAccountControl {
  [DllImport("kernel32",CharSet=CharSet.Unicode)]static extern bool QueryFullProcessImageName(IntPtr process,uint flags,StringBuilder path,ref uint size);
  static string Image(Process process){IntPtr handle=OpenProcess(0x1000,false,process.Id);try{var path=new StringBuilder(2048);uint size=(uint)path.Capacity;return handle!=IntPtr.Zero&&QueryFullProcessImageName(handle,0,path,ref size)?path.ToString():"";}finally{if(handle!=IntPtr.Zero)CloseHandle(handle);}}
  static bool Own(Process process){IntPtr handle=OpenProcess(0x1000,false,process.Id),token=IntPtr.Zero;try{if(handle==IntPtr.Zero||!OpenProcessToken(handle,8,out token))return false;using(var identity=new WindowsIdentity(token))return identity.User==WindowsIdentity.GetCurrent().User;}finally{if(token!=IntPtr.Zero)CloseHandle(token);if(handle!=IntPtr.Zero)CloseHandle(handle);}}
- static Process[] Clients(){return new[]{"steam","steamwebhelper","gameoverlayui64","steamerrorreporter64"}.SelectMany(name=>Process.GetProcessesByName(name)).Where(p=>{try{return Own(p)&&Image(p).StartsWith(Client,StringComparison.OrdinalIgnoreCase);}catch{return false;}}).ToArray();}
+ static Process[] Clients(){return new[]{"steam","steamwebhelper","gameoverlayui","gameoverlayui64","steamerrorreporter","steamerrorreporter64","millennium.luavm64","millennium.crashhandler64"}.SelectMany(name=>Process.GetProcessesByName(name)).Where(p=>{try{return Own(p)&&Image(p).StartsWith(Client,StringComparison.OrdinalIgnoreCase);}catch{return false;}}).ToArray();}
  static bool ForeignClient(){return Process.GetProcessesByName("steam").Any(p=>Image(p).Equals(Client+"steam.exe",StringComparison.OrdinalIgnoreCase)&&!Own(p));}
  static Process[] Games(int app=0){
   var tracked=new Dictionary<int,Tuple<int,DateTime>>();string log=Client+@"logs\gameprocess_log.txt";
@@ -56,8 +56,10 @@ public static class NativeAccountControl {
    if(add.Success)tracked[Int32.Parse(add.Groups[3].Value)]=Tuple.Create(Int32.Parse(add.Groups[2].Value),DateTime.Parse(add.Groups[1].Value,System.Globalization.CultureInfo.InvariantCulture));
    var remove=Regex.Match(line,@"AppID \d+ no longer tracking PID (\d+)");if(remove.Success)tracked.Remove(Int32.Parse(remove.Groups[1].Value));
   }
-  return tracked.Where(item=>app==0||item.Value.Item1==app).Select(item=>{try{var process=Process.GetProcessById(item.Key);return Own(process)&&Math.Abs((process.StartTime-item.Value.Item2).TotalSeconds)<15?process:null;}catch{return null;}}).Where(p=>p!=null).ToArray();
+  return tracked.Where(item=>item.Value.Item1>0&&(app==0||item.Value.Item1==app)).Select(item=>{try{var process=Process.GetProcessById(item.Key);return Own(process)&&!IsLauncher(process.ProcessName)&&Math.Abs((process.StartTime-item.Value.Item2).TotalSeconds)<15?process:null;}catch{return null;}}).Where(p=>p!=null).ToArray();
  }
+ static bool IsLauncher(string name){return new[]{"steam","steamwebhelper","steamservice","NativeAccountControl","gameoverlayui","gameoverlayui64","steamerrorreporter","steamerrorreporter64"}.Contains(name,StringComparer.OrdinalIgnoreCase);}
+ static void StopOwned(Process process,bool game){if(!Own(process)||(game?IsLauncher(process.ProcessName):!Image(process).StartsWith(Client,StringComparison.OrdinalIgnoreCase)))throw new IOException("Refusing to stop a process outside the managed second client.");if(game){process.CloseMainWindow();if(process.WaitForExit(5000))return;}process.Kill();process.WaitForExit(5000);}
  static void Write(object value){Directory.CreateDirectory(Root+@"\Evidence");File.WriteAllText(Root+@"\Evidence\native-control.json",new JavaScriptSerializer().Serialize(value));}
  public static int Main(string[] args){try{if(args.Length!=2||args[0]!="broker")return 2;NativePaths.Initialize(args[1]);return Broker(NativePaths.Identity.IssuerSID);}catch(Exception ex){try{Directory.CreateDirectory(Root+@"\Evidence");File.WriteAllText(Root+@"\Evidence\controller-error.txt",ex.Message);}catch{}return 1;}}
  static int Broker(string issuer){
@@ -101,15 +103,17 @@ public static class NativeAccountControl {
    if(roots.Length>1)throw new Exception("Duplicate native clients found; close extras before continuing.");
    Environment.SetEnvironmentVariable("steam_master_ipc_name_override",null);
    if(roots.Length==0){
+    // Millennium resolves its installation through this account's HKCU before Steam initializes it.
+    using(var key=Registry.CurrentUser.CreateSubKey(@"Software\Valve\Steam")){key.SetValue("SteamPath",Client.TrimEnd('\\').Replace('\\','/'));key.SetValue("SteamExe",(Client+"steam.exe").Replace('\\','/'));}
     // Reusing the IPC override on a running client can spawn another instance.
-    Process.Start(new ProcessStartInfo(Client+"steam.exe","-master_ipc_name_override "+Ipc+" -foreground steam://open/main"){UseShellExecute=false,WorkingDirectory=Client});
+    var launch=new ProcessStartInfo(Client+"steam.exe","-master_ipc_name_override "+Ipc+" -foreground"){UseShellExecute=false,WorkingDirectory=Client};foreach(string name in new[]{"SteamAppId","SteamGameId","SteamOverlayGameId","SteamClientLaunch"})launch.EnvironmentVariables.Remove(name);Process.Start(launch);
     action="focus";
    }
    action="focus";
   }
   if(action=="close-game"){
    int app;if(args.Length!=2||!Int32.TryParse(args[1],out app)||app<=0)throw new Exception("Invalid game ID.");
-   foreach(var game in Games(app)){try{game.CloseMainWindow();if(!game.WaitForExit(5000)){game.Kill();game.WaitForExit(5000);}}catch{}}
+   foreach(var game in Games(app)){try{StopOwned(game,true);}catch{}}
    if(Games(app).Any())throw new Exception("The game could not be closed; close its window manually.");Write(new{Success=true,GameClosed=app});return 0;
   }
   if(action=="ack-input"){
@@ -123,9 +127,10 @@ public static class NativeAccountControl {
    Write(new{Success=true,InfoDialogClicked=clicked});return 0;
   }
   if(action=="stop"){
-   foreach(var game in Games()){try{game.CloseMainWindow();if(!game.WaitForExit(5000))game.Kill();}catch{}}
+   foreach(var game in Games()){try{StopOwned(game,true);}catch{}}
    if(Games().Any())throw new Exception("Close the second account's game before quitting Steam.");
-   foreach(var process in clients.OrderBy(p=>p.ProcessName.Equals("steam",StringComparison.OrdinalIgnoreCase)?1:0)){try{process.Kill();process.WaitForExit(5000);}catch{}}
+   foreach(var process in clients.OrderBy(p=>p.ProcessName.Equals("steam",StringComparison.OrdinalIgnoreCase)?0:1)){try{StopOwned(process,false);}catch{}}
+   for(int attempt=0;attempt<4&&Clients().Any();attempt++){foreach(var process in Clients())try{StopOwned(process,false);}catch{}Thread.Sleep(250);}
    if(Clients().Any())throw new Exception("Some native client processes could not be stopped.");
    Write(new{Success=true,Stopped=true});return 0;
   }

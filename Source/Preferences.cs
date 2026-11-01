@@ -1,6 +1,7 @@
 using System;using System.IO;using System.Web.Script.Serialization;
 public sealed class Preferences {
  public bool TrayOnClose=true,SecondTray=true,SeparateTaskbar=true;
+ public bool RecoverMillennium=true;
  public bool KeepSecondRunning=false,AutoUpdates=true,ImportMillennium=false,ImportThemes=false,ImportThemeSettings=false,ImportPlugins=false,SyncMillennium=false,IncludeSystemDriveLibraries=true;
  public static Preferences Current=new Preferences();
  static string FilePath{get{return Path.Combine(Engine.Home,@"Data\preferences.json");}}
