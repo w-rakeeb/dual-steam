@@ -1,0 +1,48 @@
+using System;using System.IO;using System.Linq;using System.ComponentModel;using System.Diagnostics;using System.Runtime.InteropServices;using System.Security.Principal;using System.Web.Script.Serialization;using Microsoft.Win32;
+public sealed class AccountAppearanceOptions {public string Name="Dual Steam background profile";public bool Hidden=true;public string SID;}
+public sealed class AccountAppearanceRequest {public string User,SID,IssuerSID,Name;public bool Hidden=true;}
+public static class AccountAppearance {
+ static string Home{get{return Path.GetDirectoryName(typeof(AccountAppearance).Assembly.Location);}}
+ public const string UserList=@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\SpecialAccounts\UserList";
+ static string State{get{return Path.Combine(Home,@"Data\Native\appearance.json");}}
+ [StructLayout(LayoutKind.Sequential,CharSet=CharSet.Unicode)]struct UserInfo10{public string User,Comment,UserComment,FullName;}
+ [StructLayout(LayoutKind.Sequential,CharSet=CharSet.Unicode)]struct FullNameInfo{public string Name;}
+ [DllImport("netapi32.dll",CharSet=CharSet.Unicode)]static extern int NetUserGetInfo(string server,string user,int level,out IntPtr buffer);
+ [DllImport("netapi32.dll",CharSet=CharSet.Unicode)]static extern int NetUserSetInfo(string server,string user,int level,ref FullNameInfo info,out int error);
+ [DllImport("netapi32.dll",CharSet=CharSet.Unicode)]static extern int NetUserGetLocalGroups(string server,string user,int level,int flags,out IntPtr buffer,int max,out int read,out int total);
+ [DllImport("netapi32.dll")]static extern int NetApiBufferFree(IntPtr buffer);
+ public static string ValidateName(string name){name=(name??"").Trim();if(name.Length==0||name.Length>80||name.Any(Char.IsControl))throw new ArgumentException("Enter a display name between 1 and 80 characters, without line breaks or control characters.");return name;}
+ public static void ValidateIdentity(string user,string sid,string issuer,string actualSid){
+  if(user==null||!(user=="DualSteamLocal"||System.Text.RegularExpressions.Regex.IsMatch(user,"^DualSteam_[a-f0-9]{8}$"))||String.IsNullOrEmpty(sid)||sid!=actualSid||sid==issuer||!new SecurityIdentifier(sid).IsAccountSid()||!new SecurityIdentifier(issuer).IsAccountSid())throw new IOException("The managed Windows account could not be verified. No account was changed.");
+ }
+ static NativeAccount Verified(){
+  string file=Path.Combine(Home,@"Data\Native\account.json");SettingsTransfer.NoLinks(file);var metadata=new JavaScriptSerializer().Deserialize<System.Collections.Generic.Dictionary<string,object>>(File.ReadAllText(file));object managed;if(!metadata.TryGetValue("ManagedBy",out managed)||!Convert.ToString(managed).StartsWith("Dual Steam",StringComparison.Ordinal))throw new IOException("This account is not managed by Dual Steam.");
+  var account=new JavaScriptSerializer().Deserialize<NativeAccount>(File.ReadAllText(file));if(account==null)throw new IOException("The account record is unreadable.");string sid=((SecurityIdentifier)new NTAccount(Environment.MachineName,account.User).Translate(typeof(SecurityIdentifier))).Value;ValidateIdentity(account.User,account.SID,account.IssuerSID,sid);
+  string registered=Registry.GetValue(@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\"+account.SID,"ProfileImagePath",null) as string;
+  if(String.IsNullOrEmpty(account.Profile)||!Path.IsPathRooted(account.Profile)||Path.GetFileName(account.Profile.TrimEnd('\\'))!="Windows Profile"||String.IsNullOrEmpty(registered)||!Environment.ExpandEnvironmentVariables(registered).TrimEnd('\\').Equals(account.Profile.TrimEnd('\\'),StringComparison.OrdinalIgnoreCase))throw new IOException("The managed Windows profile location could not be verified.");return account;
+ }
+ static string ReadName(string user){IntPtr buffer;int code=NetUserGetInfo(null,user,10,out buffer);if(code!=0)throw new Win32Exception(code);try{return ((UserInfo10)Marshal.PtrToStructure(buffer,typeof(UserInfo10))).FullName;}finally{NetApiBufferFree(buffer);}}
+ static void SetName(string user,string name){int error;var info=new FullNameInfo{Name=name};int code=NetUserSetInfo(null,user,1011,ref info,out error);if(code!=0)throw new Win32Exception(code);}
+ static void RequireStandard(string user){IntPtr buffer;int read,total;int code=NetUserGetLocalGroups(null,user,0,1,out buffer,-1,out read,out total);if(code!=0)throw new Win32Exception(code);try{for(int i=0;i<read;i++){string group=Marshal.PtrToStringUni(Marshal.ReadIntPtr(buffer,i*IntPtr.Size));var sid=(SecurityIdentifier)new NTAccount(group).Translate(typeof(SecurityIdentifier));if(sid.Value=="S-1-5-32-544")throw new IOException("This managed account is now an administrator. Restore it to a standard account before changing sign-in visibility.");}}finally{NetApiBufferFree(buffer);}}
+ public static AccountAppearanceOptions Read(){var account=Verified();object hidden=Registry.GetValue(@"HKEY_LOCAL_MACHINE\"+UserList,account.User,null);return new AccountAppearanceOptions{Name=ReadName(account.User),Hidden=hidden is int&&(int)hidden==0,SID=account.SID};}
+ public static AccountAppearanceOptions Selection(){if(File.Exists(State)){SettingsTransfer.NoLinks(State);var saved=new JavaScriptSerializer().Deserialize<AccountAppearanceOptions>(File.ReadAllText(State));var account=Verified();if(saved==null||saved.SID!=account.SID)throw new IOException("The saved account appearance belongs to another setup.");saved.Name=ValidateName(saved.Name);return Read();}var actual=Read();actual.Hidden=true;if(String.IsNullOrWhiteSpace(actual.Name))actual.Name=new AccountAppearanceOptions().Name;return actual;}
+ public static bool NeedsDefaults{get{return !File.Exists(State)&&File.Exists(Path.Combine(Home,@"Data\Native\account.json"))&&!RemovalService.Pending;}}
+ public static void EnsureDefaults(){if(NeedsDefaults){var selection=Selection();Apply(selection.Name,true);}}
+ public static void Apply(string name,bool hidden){
+  RemovalService.RequireComplete();var account=Engine.Account();Verified();name=ValidateName(name);string folder=Path.GetDirectoryName(State),request=Path.Combine(folder,"appearance-request.json"),result=Path.Combine(folder,"appearance-result.json");SettingsTransfer.NoLinks(folder);SettingsTransfer.NoLinks(request);SettingsTransfer.NoLinks(result);File.WriteAllText(request,new JavaScriptSerializer().Serialize(new AccountAppearanceRequest{User=account.User,SID=account.SID,IssuerSID=account.IssuerSID,Name=name,Hidden=hidden}));if(File.Exists(result))File.Delete(result);
+  using(var process=Process.Start(new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),@"WindowsPowerShell\v1.0\powershell.exe"),"-NoProfile -ExecutionPolicy Bypass -File "+Engine.Quote(Path.Combine(Home,@"Source\Setup-Elevated.ps1"))+" -AccountAppearance -Request "+Engine.Quote(request)){UseShellExecute=true,Verb="runas",WindowStyle=ProcessWindowStyle.Hidden})){
+   if(!process.WaitForExit(120000))throw new IOException("The account change is still waiting for Windows. Finish its administrator prompt before retrying.");if(process.ExitCode!=0){string error="The account change was not applied.";if(File.Exists(result)){var response=new JavaScriptSerializer().Deserialize<System.Collections.Generic.Dictionary<string,object>>(File.ReadAllText(result));if(response.ContainsKey("Error"))error+=" "+Convert.ToString(response["Error"]);}throw new IOException(error);}
+  }var actual=Read();if(actual.Name!=name||actual.Hidden!=hidden)throw new IOException("Windows did not confirm the requested name and sign-in visibility.");
+ }
+ public static void ApplyRequest(string request){
+  string expected=Path.Combine(Path.GetDirectoryName(State),"appearance-request.json");if(!Path.GetFullPath(request).Equals(expected,StringComparison.OrdinalIgnoreCase))throw new IOException("Unexpected account appearance request.");SettingsTransfer.NoLinks(request);if(new FileInfo(request).Length>16384)throw new IOException("The account appearance request is too large.");var r=new JavaScriptSerializer().Deserialize<AccountAppearanceRequest>(File.ReadAllText(request));var account=Verified();if(r==null||r.User!=account.User||r.SID!=account.SID||r.IssuerSID!=account.IssuerSID)throw new IOException("The managed account changed after the request.");ApplyVerified(account,ValidateName(r.Name),r.Hidden);
+ }
+ public static void ApplySetupDefaults(){ApplyVerified(Verified(),new AccountAppearanceOptions().Name,true);}
+ static void ApplyVerified(NativeAccount account,string name,bool hidden){
+  if(!new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator))throw new UnauthorizedAccessException("Administrator permission is required to change account appearance.");RequireStandard(account.User);string before=ReadName(account.User);SettingsTransfer.NoLinks(State);SettingsTransfer.NoLinks(State+".new");
+  using(var key=Registry.LocalMachine.CreateSubKey(UserList)){object old=key.GetValue(account.User,null);var kind=old==null?RegistryValueKind.DWord:key.GetValueKind(account.User);try{
+   SetName(account.User,name);if(hidden)key.SetValue(account.User,0,RegistryValueKind.DWord);else key.DeleteValue(account.User,false);
+   var state=new AccountAppearanceOptions{Name=name,Hidden=hidden,SID=account.SID};File.WriteAllText(State+".new",new JavaScriptSerializer().Serialize(state));if(File.Exists(State))File.Replace(State+".new",State,null);else File.Move(State+".new",State);
+  }catch{SetName(account.User,before);if(old==null)key.DeleteValue(account.User,false);else key.SetValue(account.User,old,kind);if(File.Exists(State+".new"))File.Delete(State+".new");throw;}}
+ }
+}

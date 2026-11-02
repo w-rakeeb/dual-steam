@@ -11,7 +11,7 @@ namespace DualSteam {
  public sealed class ReleaseInfo {public string Tag,Page,Download,Sha256;public Version Version;public long Size;}
  public sealed class UpdateRequest {public string Target,Package,Sha256,Version;public int ManagerPid;public long ManagerStartTicks;public bool Restart=true;}
  public static class UpdateService {
-  public const string Repository="w-rakeeb/dual-steam",CurrentVersion="3.4.0",AssetName="Dual-Steam-Windows.zip";
+  public const string Repository="w-rakeeb/dual-steam",CurrentVersion="3.4.1",AssetName="Dual-Steam-Windows.zip";
   public static Version ParseVersion(string text){Version version;if(String.IsNullOrEmpty(text)||!System.Text.RegularExpressions.Regex.IsMatch(text,"^v?[0-9]+\\.[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$")||!Version.TryParse(text.TrimStart('v'),out version))throw new IOException("The release version is not supported.");return version;}
   public static bool TrustedAsset(string text){Uri uri;return Uri.TryCreate(text,UriKind.Absolute,out uri)&&uri.Scheme=="https"&&uri.Host=="github.com"&&uri.AbsolutePath.StartsWith("/"+Repository+"/releases/download/",StringComparison.Ordinal)&&String.IsNullOrEmpty(uri.UserInfo)&&String.IsNullOrEmpty(uri.Query)&&String.IsNullOrEmpty(uri.Fragment);}
   static HttpWebResponse Open(string address,CancellationToken cancel=default(CancellationToken)){

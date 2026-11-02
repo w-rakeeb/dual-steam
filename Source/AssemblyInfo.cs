@@ -3,5 +3,5 @@ using System.Reflection;
 [assembly:AssemblyDescription("Two independent Steam logins on one desktop")]
 [assembly:AssemblyCompany("Wrakeeb")]
 [assembly:AssemblyProduct("Dual Steam")]
-[assembly:AssemblyVersion("3.4.0.0")]
-[assembly:AssemblyFileVersion("3.4.0.0")]
+[assembly:AssemblyVersion("3.4.1.0")]
+[assembly:AssemblyFileVersion("3.4.1.0")]

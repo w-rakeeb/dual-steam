@@ -2,7 +2,7 @@
 
 Two independent Steam logins on one Windows desktop, with separate account data and shared installed game libraries.
 
-**Windows 10 / Windows 11, x64 · .NET Framework 4.8 · Version 3.4.0**
+**Windows 10 / Windows 11, x64 · .NET Framework 4.8 · Version 3.4.1**
 
 [Download the latest release](https://github.com/w-rakeeb/dual-steam/releases/latest)
 
@@ -90,6 +90,16 @@ On Windows x64 with .NET Framework 4.8:
 The build produces the manager, updater and native controller. The package script uses an explicit runtime-file allowlist and excludes private data. Source code is MIT licensed. Steam names, logos and other trademarks belong to Valve; the artwork source is documented in `Assets/SOURCE.md`.
 
 Medal integration is left unchanged during launch. The optional compatibility control is troubleshooting only, not a requirement or a confirmed diagnosis. Main Steam, Second Steam and the manager have distinct taskbar identities; desktop and recognized pinned shortcuts are repaired by Add / repair desktop shortcuts.
+
+## Version 3.4.1 Windows account appearance
+
+Under **Settings → General → Windows account appearance**, enter a display name, choose **Hide from Windows sign-in**, and click **Apply account appearance**. Applying requests Windows administrator permission. The display name changes the Windows full-name field; the internal login name, SID, profile paths and Steam credentials remain unchanged ([Windows API](https://learn.microsoft.com/en-us/windows/win32/api/lmaccess/nf-lmaccess-netusersetinfo)).
+
+New setups are hidden from the Windows sign-in account list by default. Existing setups apply this default once at their next authorized startup; if administrator approval is declined, use the Apply button to retry. An explicit show-account choice is preserved. The account remains visible under Windows Settings → Accounts → Other users. Sign-in hiding is a display preference, not an account-disable or security boundary ([Microsoft Q&A](https://learn.microsoft.com/en-ie/answers/questions/1281830/how-to-remove-user-account-from-windows-logon-scre)).
+
+Only the verified managed standard account can be changed. The setup owner's account and unrelated accounts are rejected. A failed save rolls back the name and sign-in value. Setup removal clears only this managed account's visibility entry. Existing preference reset does not reset Windows account appearance.
+
+**Validation:** 123 automated checks, native display-name round trip, hide/show round trip, unchanged account SID, preserved explicit visibility choice, and dark/light Settings renders. The actual Windows sign-in screen was not exercised by signing out or rebooting; recipient-PC and Windows 10 behavior still need confirmation.
 
 ## Version 3.4.0 stability and desktop controls
 

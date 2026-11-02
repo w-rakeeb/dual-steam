@@ -1,4 +1,17 @@
-param([Parameter(Mandatory=$true)][string]$Request,[switch]$Remove)
+param([Parameter(Mandatory=$true)][string]$Request,[switch]$Remove,[switch]$AccountAppearance)
+if($AccountAppearance){
+ $ErrorActionPreference='Stop'
+ $project=Split-Path $PSScriptRoot -Parent
+ $result=Join-Path $project 'Data\Native\appearance-result.json'
+ $safe=$false
+ try{
+  [void][Reflection.Assembly]::LoadFrom((Join-Path $project 'Dual Steam.exe'))
+  [SettingsTransfer]::NoLinks($result);$safe=$true
+  [AccountAppearance]::ApplyRequest($Request)
+  @{Success=$true}|ConvertTo-Json|Set-Content -LiteralPath $result -Encoding UTF8
+  exit 0
+ }catch{if($safe){@{Success=$false;Error=$_.Exception.Message}|ConvertTo-Json|Set-Content -LiteralPath $result -Encoding UTF8};exit 1}
+}
 if($Remove){
 $ErrorActionPreference='Stop'
 $env:PSModulePath=Join-Path $PSHOME 'Modules'
@@ -68,6 +81,8 @@ try{
  foreach($folder in @($project,(Join-Path $project 'Assets'),(Join-Path $project 'Data'),(Join-Path $project 'Tools'))){[SettingsTransfer]::NoLinks($folder);$acl=Get-Acl -LiteralPath $folder;foreach($rule in $acl.GetAccessRules($true,$false,[Security.Principal.SecurityIdentifier])){if($rule.IdentityReference.Value -eq $r.SID){$acl.RemoveAccessRuleSpecific($rule)}};Set-Acl -LiteralPath $folder -AclObject $acl}
  if($user){Remove-LocalUser -SID $user.SID}
  if(Get-LocalUser -Name $r.User -ErrorAction SilentlyContinue){throw 'The managed Windows account could not be removed'}
+ $userList='HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\SpecialAccounts\UserList'
+ if(Test-Path -LiteralPath $userList){Remove-ItemProperty -LiteralPath $userList -Name $r.User -ErrorAction SilentlyContinue}
  @{Success=$true;AccountRemoved=$r.User;SID=$r.SID;RootRemoved=$r.Root}|ConvertTo-Json|Set-Content -LiteralPath $result -Encoding UTF8
  Remove-Item -LiteralPath $marker
  exit 0
@@ -142,6 +157,8 @@ using System;using System.Text;using System.Runtime.InteropServices;public stati
  Copy-Item -LiteralPath $r.Steam -Destination (Join-Path $client 'steam.exe')
  Copy-Item -LiteralPath (Join-Path $project 'Tools\NativeAccountControl.exe') -Destination (Join-Path $client 'NativeAccountControl.exe')
  @{User=$r.User;SID=$user.SID.Value;IssuerSID=$r.IssuerSID;Profile=$profile;ManagedBy='Dual Steam 3';OriginalProfileBackup=$initial}|ConvertTo-Json|Set-Content -Encoding UTF8 (Join-Path $state 'account.json')
+ [void][Reflection.Assembly]::LoadFrom((Join-Path $project 'Dual Steam.exe'))
+ [AccountAppearance]::ApplySetupDefaults()
  @{Success=$true;Profile=$profile;WindowsProfileBootstrapBackup=$initial;Account=$r.User}|ConvertTo-Json|Set-Content -Encoding UTF8 $result
  exit 0
 }catch{
